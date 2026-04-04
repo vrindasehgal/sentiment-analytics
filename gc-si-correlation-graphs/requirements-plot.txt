@@ -1,0 +1,3 @@
+# For gc-si-correlation-graphs/plot_gc_si.py
+pandas>=2.0
+matplotlib>=3.7
