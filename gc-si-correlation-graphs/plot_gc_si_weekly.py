@@ -278,6 +278,7 @@ def fig4_composite_weekly(
 def _safe_stats(
     chosen: date,
     week_days: list[date],
+    week_df: pd.DataFrame,
     daily_corr: pd.Series,
 ) -> tuple[float, np.ndarray, float, float, float, str]:
     today_corr = daily_corr.get(chosen, np.nan)
@@ -291,15 +292,25 @@ def _safe_stats(
         today_note = ""
 
     other_days = [d for d in week_days if d != chosen]
-    hist_series = daily_corr.reindex(other_days).dropna()
-    hist_vals = hist_series.values.astype(float)
+    intraday_samples: list[np.ndarray] = []
+    for d in other_days:
+        g = week_df[week_df["cal_day"] == d].sort_values("ts")
+        if len(g) < MIN_BARS_PER_DAY:
+            continue
+        roll = _rolling_intraday_corr(g).dropna()
+        if len(roll) > 0:
+            intraday_samples.append(roll.values.astype(float))
+    if intraday_samples:
+        hist_vals = np.concatenate(intraday_samples)
+    else:
+        hist_vals = np.array([], dtype=float)
 
     if len(hist_vals) == 0:
         hist_vals = np.array([today_corr, today_corr], dtype=float)
-        lookback_note = "No valid other weekdays in this week; fallback uses chosen-day corr only."
+        lookback_note = "No valid 15m sequence samples from other weekdays; fallback uses chosen-day corr only."
     elif len(hist_vals) == 1:
         hist_vals = np.array([hist_vals[0], hist_vals[0]], dtype=float)
-        lookback_note = "Only one valid other weekday in this week; duplicated for stable rendering."
+        lookback_note = "Only one valid 15m sequence sample from other weekdays; duplicated for stable rendering."
     else:
         lookback_note = ""
 
@@ -357,8 +368,11 @@ def main() -> None:
         dtype=float,
     ).sort_index()
 
-    today_corr, hist_vals, mu, sigma, z, notes = _safe_stats(chosen, week_days, daily_corr)
-    lookback_caption = f"Other weekdays in same ISO week ({monday.isoformat()} to {friday.isoformat()})"
+    today_corr, hist_vals, mu, sigma, z, notes = _safe_stats(chosen, week_days, week_df, daily_corr)
+    lookback_caption = (
+        "15m rolling-correlation samples from other weekdays "
+        f"in same ISO week ({monday.isoformat()} to {friday.isoformat()})"
+    )
     if notes:
         lookback_caption = f"{lookback_caption}. {notes}"
     lookback_used = len(hist_vals)
