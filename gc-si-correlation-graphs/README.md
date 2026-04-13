@@ -15,6 +15,15 @@ All outputs are named with your `--day` as `YYYY-MM-DD`.
 | `03_corr_bellcurve_<date>.png` | **Distribution of daily Pearson correlation** between GC and SI **intraday returns**, over a **lookback window** of prior trading days (see below). Histogram (counts) on the left y-axis; optional KDE on a **right** y-axis (density). Vertical lines at μ, ±1σ/±2σ/±3σ, and **today’s** daily correlation. Text box: μ, σ, today’s corr, deviation, z-score. |
 | `04_ratio_and_bellcurve_<date>.png` | **Composite:** **Rolling intraday Pearson correlation** (20 consecutive 15m bars ≈ 5h window) vs **time** on the **bottom** x-axis; **y-axis = correlation**. Horizontal **dashed** lines at μ ± 1σ, ±2σ, ±3σ; **solid** lines at μ and **today’s daily** correlation. A **Gaussian KDE** of the **same historical daily correlations** as figure 3 is drawn using a **second x-axis** on the **top** (`twiny`): correlation on that axis, with **density normalized** to a relative height and **mapped into the correlation y-range** (shape only—not literal density units). Stats box matches figure 3 context. |
 
+Weekly outputs are named with week token `YYYY-Www_MM-DD_to_MM-DD` (ISO Monday through Friday).
+
+| File | Contents |
+|------|----------|
+| `01_gc_si_overlay_weekly_<week>.png` | **Dual y-axes:** GC `SeqClose` (left) and SI `SeqClose` (right) using all aligned 15m bars in the ISO Mon-Fri week. X-axis is compressed to remove overnight gaps, with ticks labeled by day (`Mon`, `Tue`, ...). |
+| `02_ratio_intraday_weekly_<week>.png` | **GC/SI ratio** (`close_gc / close_si`) across all 15m bars in the ISO Mon-Fri week. Same gapless day-to-day x-axis treatment as weekly figure 01 and optional `--ratio-ylim`. |
+| `03_corr_bellcurve_weekly_<week>.png` | **Weekly bell curve view:** histogram + KDE built from **15m rolling-correlation sequence samples** (20-bar rolling Pearson) from the **other days of that week** (excluding chosen `--day`). Vertical markers and stats still reference **today’s daily correlation** and derived μ/σ/z of the weekly sample. |
+| `04_ratio_and_bellcurve_weekly_<week>.png` | **Weekly composite:** rolling intraday correlation vs time for the full week plus a top-axis KDE built from the **same 15m rolling-correlation weekly sample** used in weekly figure 03. Sigma bands, mean line, and today-correlation line are computed from that weekly sample. |
+
 **Naming note:** Figure 4’s filename still contains `ratio_and_bellcurve` for historical reasons; the chart is about **correlation**, not the GC/SI price ratio.
 
 ## How the script works (pipeline)
@@ -112,8 +121,8 @@ For `plot_gc_si_weekly.py`, only `--day`, `--gc`, `--si`, `--out-dir`, and `--ra
 The weekly script is additive and does not replace daily outputs.
 
 - **Figure 01 and 02 weekly:** still use the original 15-minute bars, but x-axis ticks are day names (`Mon`, `Tue`, ...) placed at the first available bar of each day.
-- **Figure 03 weekly:** "today's correlation" is still the chosen day's daily Pearson correlation (from that day's 15-minute returns). The bell curve uses daily correlations from the *other* days in the same Mon-Fri week.
-- **Figure 04 weekly:** uses the same weekly statistical semantics as weekly figure 03.
+- **Figure 03 weekly:** "today's correlation" is still the chosen day's daily Pearson correlation (from that day's 15-minute returns). The bell curve sample is built from 15m rolling-correlation sequence values from the *other* days in the same Mon-Fri week.
+- **Figure 04 weekly:** uses the same weekly 15m rolling-correlation sample semantics as weekly figure 03.
 - **Edge cases:** if the week has missing/sparse data, the script still completes. It renders fallback visuals/annotations when correlations cannot be computed with normal sample sizes.
 
 ## Troubleshooting
