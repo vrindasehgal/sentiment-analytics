@@ -78,6 +78,15 @@ def _format_weekday_axis(ax, week_df: pd.DataFrame) -> None:
     ax.set_xlabel("Day")
 
 
+def _week_bar_index_and_ticks(week_df: pd.DataFrame) -> tuple[np.ndarray, list[int], list[str]]:
+    ordered = week_df.sort_values("ts")
+    x = np.arange(len(ordered), dtype=float)
+    first_bars = ordered.groupby("cal_day", sort=True).head(1)
+    tick_positions = [int(i) for i in first_bars.index]
+    tick_labels = [d.strftime("%a") for d in first_bars["cal_day"]]
+    return x, tick_positions, tick_labels
+
+
 def _render_info_figure(out_path: Path, title: str, lines: list[str]) -> None:
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.set_title(title)
@@ -98,21 +107,26 @@ def _render_info_figure(out_path: Path, title: str, lines: list[str]) -> None:
 
 
 def fig1_overlay_weekly(week_df: pd.DataFrame, out_path: Path, week_label: str) -> None:
+    ordered = week_df.sort_values("ts").reset_index(drop=True)
+    x, tick_positions, tick_labels = _week_bar_index_and_ticks(ordered)
     fig, ax = plt.subplots(figsize=(11, 5))
-    ax.plot(week_df["ts"], week_df["close_gc"], label="GC close (SeqClose)", color="#ffd700", linewidth=1.2)
+    ax.plot(x, ordered["close_gc"], label="GC close (SeqClose)", color="#ffd700", linewidth=1.2)
     ax.set_ylabel("GC close", color="#ffd700")
     ax.tick_params(axis="y", labelcolor="#ffd700")
     ax.spines["left"].set_color("#ffd700")
     ax.grid(True, alpha=0.35)
 
     ax2 = ax.twinx()
-    ax2.plot(week_df["ts"], week_df["close_si"], label="SI close (SeqClose)", color="#c0c0c0", linewidth=1.2)
+    ax2.plot(x, ordered["close_si"], label="SI close (SeqClose)", color="#c0c0c0", linewidth=1.2)
     ax2.set_ylabel("SI close", color="#c0c0c0")
     ax2.tick_params(axis="y", labelcolor="#c0c0c0")
     ax2.spines["right"].set_color("#c0c0c0")
 
     ax.set_title(f"Gold & silver — raw SeqClose (dual axis) — Weekly {week_label}")
-    _format_weekday_axis(ax, week_df)
+    ax.set_xticks(tick_positions)
+    ax.set_xticklabels(tick_labels)
+    ax.tick_params(axis="x", rotation=0)
+    ax.set_xlabel("Day")
     h1, l1 = ax.get_legend_handles_labels()
     h2, l2 = ax2.get_legend_handles_labels()
     ax.legend(h1 + h2, l1 + l2, loc="upper left")
@@ -124,13 +138,18 @@ def fig1_overlay_weekly(week_df: pd.DataFrame, out_path: Path, week_label: str) 
 def fig2_ratio_weekly(
     week_df: pd.DataFrame, out_path: Path, week_label: str, ratio_ylim: tuple[float, float] | None
 ) -> None:
+    ordered = week_df.sort_values("ts").reset_index(drop=True)
+    x, tick_positions, tick_labels = _week_bar_index_and_ticks(ordered)
     fig, ax = plt.subplots(figsize=(11, 5))
-    ax.plot(week_df["ts"], week_df["ratio"], color="#6ec1ff", linewidth=1.2)
-    _apply_ratio_ylim(ax, week_df["ratio"], ratio_ylim)
+    ax.plot(x, ordered["ratio"], color="#6ec1ff", linewidth=1.2)
+    _apply_ratio_ylim(ax, ordered["ratio"], ratio_ylim)
     ax.set_title(f"GC/SI ratio (intraday) — Weekly {week_label}")
     ax.set_ylabel("Ratio")
     ax.grid(True)
-    _format_weekday_axis(ax, week_df)
+    ax.set_xticks(tick_positions)
+    ax.set_xticklabels(tick_labels)
+    ax.tick_params(axis="x", rotation=0)
+    ax.set_xlabel("Day")
     fig.tight_layout()
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
