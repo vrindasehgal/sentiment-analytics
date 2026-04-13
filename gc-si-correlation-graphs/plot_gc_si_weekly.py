@@ -83,6 +83,81 @@ def _prior_weekly_mean_baseline(weekly_means: pd.Series, week_start: date, lookb
     return prior.tail(lookback_weeks)
 
 
+def _weekly_signal_screening_table(merged: pd.DataFrame) -> pd.DataFrame:
+    weekdays = merged[merged["cal_day"].map(lambda d: d.weekday() <= 4)].copy()
+    if weekdays.empty:
+        return pd.DataFrame(
+            columns=[
+                "week_tag",
+                "ratio_mu_52w",
+                "ratio_sigma_52w",
+                "week_mean_ratio",
+                "week_high_ratio",
+                "week_low_ratio",
+                "breached_upper",
+                "breached_lower",
+                "friday_last_ratio",
+                "friday_reverted",
+            ]
+        )
+
+    weekdays["week_start"] = weekdays["cal_day"].map(_iso_week_start)
+    weekly_means = weekdays.groupby("week_start", sort=True)["ratio"].mean().astype(float)
+
+    rows: list[dict[str, object]] = []
+    for week_start, g in weekdays.groupby("week_start", sort=True):
+        ordered = g.sort_values("ts")
+        week_end = week_start + timedelta(days=4)
+        week_tag = _week_tag(week_start, week_end)
+        ratio_vals = ordered["ratio"].astype(float)
+        week_mean_ratio = float(ratio_vals.mean())
+        week_high_ratio = float(ratio_vals.max())
+        week_low_ratio = float(ratio_vals.min())
+
+        baseline = _prior_weekly_mean_baseline(weekly_means, week_start, lookback_weeks=52).dropna()
+        if len(baseline) == 52:
+            ratio_mu_52w = float(np.mean(baseline.values))
+            ratio_sigma_52w = float(np.std(baseline.values, ddof=1))
+        else:
+            ratio_mu_52w = np.nan
+            ratio_sigma_52w = np.nan
+
+        friday_day = week_start + timedelta(days=4)
+        friday_rows = ordered[ordered["cal_day"] == friday_day]
+        friday_last_ratio = float(friday_rows["ratio"].iloc[-1]) if not friday_rows.empty else np.nan
+
+        if np.isnan(ratio_mu_52w) or np.isnan(ratio_sigma_52w):
+            breached_upper = None
+            breached_lower = None
+        else:
+            upper2 = ratio_mu_52w + 2.0 * ratio_sigma_52w
+            lower2 = ratio_mu_52w - 2.0 * ratio_sigma_52w
+            breached_upper = bool((ratio_vals >= upper2).any())
+            breached_lower = bool((ratio_vals <= lower2).any())
+
+        if np.isnan(friday_last_ratio) or np.isnan(ratio_mu_52w) or np.isnan(ratio_sigma_52w):
+            friday_reverted = None
+        else:
+            friday_reverted = bool(abs(friday_last_ratio - ratio_mu_52w) <= ratio_sigma_52w)
+
+        rows.append(
+            {
+                "week_tag": week_tag,
+                "ratio_mu_52w": ratio_mu_52w,
+                "ratio_sigma_52w": ratio_sigma_52w,
+                "week_mean_ratio": week_mean_ratio,
+                "week_high_ratio": week_high_ratio,
+                "week_low_ratio": week_low_ratio,
+                "breached_upper": breached_upper,
+                "breached_lower": breached_lower,
+                "friday_last_ratio": friday_last_ratio,
+                "friday_reverted": friday_reverted,
+            }
+        )
+
+    return pd.DataFrame(rows)
+
+
 def _format_weekday_axis(ax, week_df: pd.DataFrame) -> None:
     first_bars = week_df.sort_values("ts").groupby("cal_day", sort=True).head(1)
     ticks = list(first_bars["ts"])
@@ -534,6 +609,10 @@ def main() -> None:
             baseline_sigma=baseline_sigma,
             baseline_count=len(baseline_52w),
         )
+
+    screening_df = _weekly_signal_screening_table(merged)
+    screening_out = args.out_dir / "weekly_signal_screening.csv"
+    screening_df.to_csv(screening_out, index=False)
 
     print(f"Wrote weekly figures to {args.out_dir.resolve()}")
 

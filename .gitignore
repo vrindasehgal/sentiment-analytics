@@ -1,3 +1,5 @@
-gc-si-correlation-graphs/plots/
 gc-si-correlation-graphs/__pycache__/
 *.py[cod]
+*.zip
+*.pdf
+*.png
