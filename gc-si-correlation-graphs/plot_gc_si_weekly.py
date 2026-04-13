@@ -167,7 +167,22 @@ def fig3_bellcurve_weekly(
     lookback_caption: str,
 ) -> None:
     fig, ax = plt.subplots(figsize=(10, 6))
-    _bellcurve_axes(ax, hist_vals, mu, sigma, today_corr, z, day_str, lookback_used, lookback_caption)
+    _bellcurve_axes(
+        ax,
+        hist_vals,
+        mu,
+        sigma,
+        today_corr,
+        z,
+        day_str,
+        lookback_used,
+        lookback_caption,
+        hist_legend_label="Sample count",
+        y_label="Rolling-correlation samples (count)",
+        x_label="15m rolling Pearson corr (GC vs SI intraday returns)",
+        title_prefix="Historical rolling-correlation distribution vs",
+        title_count_unit="samples",
+    )
     fig.tight_layout(rect=(0, 0, 1, 0.82))
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)

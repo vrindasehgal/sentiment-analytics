@@ -256,11 +256,25 @@ def _bellcurve_axes(
     day_str: str,
     lookback_used: int,
     lookback_caption: str,
+    *,
+    hist_legend_label: str = "Day count",
+    y_label: str = "Trading days (count)",
+    x_label: str = "Daily Pearson corr (GC vs SI intraday returns)",
+    title_prefix: str = "Historical daily correlation vs",
+    title_count_unit: str = "days",
 ) -> None:
     n_bins = min(40, max(10, len(hist_vals) // 5))
-    ax.hist(hist_vals, bins=n_bins, density=False, alpha=0.55, color="#4a90d9", edgecolor="#333", label="Day count")
-    ax.set_ylabel("Trading days (count)")
-    ax.set_xlabel("Daily Pearson corr (GC vs SI intraday returns)")
+    ax.hist(
+        hist_vals,
+        bins=n_bins,
+        density=False,
+        alpha=0.55,
+        color="#4a90d9",
+        edgecolor="#333",
+        label=hist_legend_label,
+    )
+    ax.set_ylabel(y_label)
+    ax.set_xlabel(x_label)
 
     ax2 = ax.twinx()
     ax2.set_ylabel("Density (KDE)", color="#ff9f43")
@@ -290,7 +304,7 @@ def _bellcurve_axes(
     _label_at_top(ax, today_corr, f"Today's corr\n{today_corr:.3f}", "#ff6b6b", 1.035)
 
     ax.set_title(
-        f"Historical daily correlation vs {day_str}\n{lookback_caption} (n={lookback_used} days)",
+        f"{title_prefix} {day_str}\n{lookback_caption} (n={lookback_used} {title_count_unit})",
         pad=36,
     )
     h1, l1 = ax.get_legend_handles_labels()
