@@ -256,22 +256,38 @@ def _bellcurve_axes(
     day_str: str,
     lookback_used: int,
     lookback_caption: str,
+    *,
+    hist_legend_label: str = "Day count",
+    y_label: str = "Trading days (count)",
+    x_label: str = "Daily Pearson corr (GC vs SI intraday returns)",
+    title_prefix: str = "Historical daily correlation vs",
+    title_count_unit: str = "days",
 ) -> None:
     n_bins = min(40, max(10, len(hist_vals) // 5))
-    ax.hist(hist_vals, bins=n_bins, density=False, alpha=0.55, color="#4a90d9", edgecolor="#333", label="Day count")
-    ax.set_ylabel("Trading days (count)")
-    ax.set_xlabel("Daily Pearson corr (GC vs SI intraday returns)")
+    ax.hist(
+        hist_vals,
+        bins=n_bins,
+        density=False,
+        alpha=0.55,
+        color="#4a90d9",
+        edgecolor="#333",
+        label=hist_legend_label,
+    )
+    ax.set_ylabel(y_label)
+    ax.set_xlabel(x_label)
 
     ax2 = ax.twinx()
     ax2.set_ylabel("Density (KDE)", color="#ff9f43")
     ax2.tick_params(axis="y", labelcolor="#ff9f43")
     ax2.spines["right"].set_color("#ff9f43")
     if len(hist_vals) >= 5:
-        s = pd.Series(hist_vals)
-        try:
-            s.plot.kde(ax=ax2, color="#ff9f43", linewidth=1.8, label="KDE")
-        except Exception:
-            pass
+        x_min = float(np.min(hist_vals))
+        x_max = float(np.max(hist_vals))
+        x_pad = max((x_max - x_min) * 0.08, 1e-4)
+        x_grid = np.linspace(x_min - x_pad, x_max + x_pad, 400)
+        kde_density = _gaussian_kde_density(hist_vals, x_grid)
+        if np.max(kde_density) > 0:
+            ax2.plot(x_grid, kde_density, color="#ff9f43", linewidth=1.8, label="KDE")
     ax2.grid(False)
 
     colors_sigma = ["#888888", "#aaaaaa", "#cccccc"]
@@ -288,7 +304,7 @@ def _bellcurve_axes(
     _label_at_top(ax, today_corr, f"Today's corr\n{today_corr:.3f}", "#ff6b6b", 1.035)
 
     ax.set_title(
-        f"Historical daily correlation vs {day_str}\n{lookback_caption} (n={lookback_used} days)",
+        f"{title_prefix} {day_str}\n{lookback_caption} (n={lookback_used} {title_count_unit})",
         pad=36,
     )
     h1, l1 = ax.get_legend_handles_labels()
