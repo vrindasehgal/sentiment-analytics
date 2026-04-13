@@ -68,6 +68,21 @@ def _week_tag(week_start: date, week_end: date) -> str:
     return f"{iso_year}-W{iso_week:02d}_{week_start:%m-%d}_to_{week_end:%m-%d}"
 
 
+def _iso_week_start(d: date) -> date:
+    return d - timedelta(days=d.weekday())
+
+
+def _weekly_mean_ratio_series(merged: pd.DataFrame) -> pd.Series:
+    tmp = merged[["cal_day", "ratio"]].copy()
+    tmp["week_start"] = tmp["cal_day"].map(_iso_week_start)
+    return tmp.groupby("week_start", sort=True)["ratio"].mean().astype(float)
+
+
+def _prior_weekly_mean_baseline(weekly_means: pd.Series, week_start: date, lookback_weeks: int = 52) -> pd.Series:
+    prior = weekly_means[weekly_means.index < week_start]
+    return prior.tail(lookback_weeks)
+
+
 def _format_weekday_axis(ax, week_df: pd.DataFrame) -> None:
     first_bars = week_df.sort_values("ts").groupby("cal_day", sort=True).head(1)
     ticks = list(first_bars["ts"])
@@ -290,6 +305,86 @@ def fig4_composite_weekly(
     plt.close(fig)
 
 
+def fig5_ratio_signal_bands_weekly(
+    week_df: pd.DataFrame,
+    out_path: Path,
+    week_label: str,
+    baseline_mu: float,
+    baseline_sigma: float,
+    baseline_count: int,
+) -> None:
+    ordered = week_df.sort_values("ts").reset_index(drop=True)
+    x, tick_positions, tick_labels = _week_bar_index_and_ticks(ordered)
+
+    mu = baseline_mu
+    sigma = baseline_sigma
+    upper1, lower1 = mu + sigma, mu - sigma
+    upper2, lower2 = mu + 2.0 * sigma, mu - 2.0 * sigma
+    ratio_vals = ordered["ratio"].astype(float)
+
+    breach_up = bool((ratio_vals > upper2).any())
+    breach_down = bool((ratio_vals < lower2).any())
+    if breach_up and breach_down:
+        signal_direction = "both"
+    elif breach_up:
+        signal_direction = "up"
+    elif breach_down:
+        signal_direction = "down"
+    else:
+        signal_direction = "none"
+    signal_flag = breach_up or breach_down
+
+    week_low = float(ratio_vals.min())
+    week_high = float(ratio_vals.max())
+    week_close = float(ratio_vals.iloc[-1])
+    closed_back_within_1sigma = lower1 <= week_close <= upper1
+
+    y_min = min(week_low, lower2, lower1, mu)
+    y_max = max(week_high, upper2, upper1, mu)
+    y_pad = max((y_max - y_min) * 0.06, 1e-6)
+
+    fig, ax = plt.subplots(figsize=(11, 5.5))
+    ax.plot(x, ratio_vals, color="#6ec1ff", linewidth=1.2, label="GC/SI ratio (15m)")
+    ax.axhline(mu, color="#ffffff", linestyle="-", linewidth=1.3, alpha=0.95, label="μ")
+    ax.axhline(upper1, color="#8a8a8a", linestyle="--", linewidth=1.0, alpha=0.85, label="+1σ / -1σ")
+    ax.axhline(lower1, color="#8a8a8a", linestyle="--", linewidth=1.0, alpha=0.85)
+    ax.axhline(upper2, color="#ff9f43", linestyle="--", linewidth=1.4, alpha=0.95, label="+2σ / -2σ")
+    ax.axhline(lower2, color="#ff9f43", linestyle="--", linewidth=1.4, alpha=0.95)
+
+    ax.set_ylim(y_min - y_pad, y_max + y_pad)
+    ax.set_title(f"GC/SI ratio with 52-week baseline bands — Weekly {week_label}")
+    ax.set_ylabel("Ratio")
+    ax.set_xticks(tick_positions)
+    ax.set_xticklabels(tick_labels)
+    ax.tick_params(axis="x", rotation=0)
+    ax.set_xlabel("Day")
+    ax.grid(True, alpha=0.35)
+
+    stats_text = (
+        f"μ={mu:.6f}  σ={sigma:.6f}\n"
+        f"Week high={week_high:.6f}\n"
+        f"Week low={week_low:.6f}\n"
+        f"±2σ breached={'yes' if signal_flag else 'no'} ({signal_direction})\n"
+        f"Closed within ±1σ={'yes' if closed_back_within_1sigma else 'no'}\n"
+        f"Baseline weeks={baseline_count}"
+    )
+    ax.text(
+        0.99,
+        0.98,
+        stats_text,
+        transform=ax.transAxes,
+        ha="right",
+        va="top",
+        fontsize=9,
+        bbox=dict(boxstyle="round", facecolor="#2a2a2a", edgecolor="#555", alpha=0.95),
+    )
+
+    ax.legend(loc="upper left", fontsize=8, framealpha=0.9)
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
 def _safe_stats(
     chosen: date,
     week_days: list[date],
@@ -359,6 +454,7 @@ def main() -> None:
     out2 = args.out_dir / f"02_ratio_intraday_weekly_{week_tag}.png"
     out3 = args.out_dir / f"03_corr_bellcurve_weekly_{week_tag}.png"
     out4 = args.out_dir / f"04_ratio_and_bellcurve_weekly_{week_tag}.png"
+    out5 = args.out_dir / f"05_ratio_signal_bands_weekly_{week_tag}.png"
 
     if week_df.empty:
         msg = [
@@ -369,6 +465,7 @@ def main() -> None:
         _render_info_figure(out2, f"Weekly GC/SI ratio — {week_tag}", msg)
         _render_info_figure(out3, f"Weekly correlation bell curve — {week_tag}", msg)
         _render_info_figure(out4, f"Weekly rolling corr + KDE — {week_tag}", msg)
+        _render_info_figure(out5, f"Weekly ratio μ/σ bands — {week_tag}", msg)
         print(f"Wrote weekly placeholder figures to {args.out_dir.resolve()}")
         return
 
@@ -416,6 +513,27 @@ def main() -> None:
         lookback_used,
         lookback_caption,
     )
+
+    weekly_means = _weekly_mean_ratio_series(merged)
+    baseline_52w = _prior_weekly_mean_baseline(weekly_means, monday, lookback_weeks=52).dropna()
+    if len(baseline_52w) < 52:
+        fig5_msg = [
+            "Figure 5 baseline requires 52 prior weeks of weekly mean GC/SI ratio.",
+            f"Available prior weekly means: {len(baseline_52w)}.",
+            "Figure 5 is rendered as placeholder for this run.",
+        ]
+        _render_info_figure(out5, f"Weekly ratio μ/σ bands — {week_tag}", fig5_msg)
+    else:
+        baseline_mu = float(np.mean(baseline_52w.values))
+        baseline_sigma = float(np.std(baseline_52w.values, ddof=1)) if len(baseline_52w) > 1 else 0.0
+        fig5_ratio_signal_bands_weekly(
+            week_df=week_df,
+            out_path=out5,
+            week_label=week_label,
+            baseline_mu=baseline_mu,
+            baseline_sigma=baseline_sigma,
+            baseline_count=len(baseline_52w),
+        )
 
     print(f"Wrote weekly figures to {args.out_dir.resolve()}")
 
