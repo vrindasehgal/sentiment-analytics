@@ -2,6 +2,8 @@
 
 This folder contains `plot_gc_si.py`, a small CLI that reads gold (GC) and silver (SI) intraday bar CSVs, merges them on timestamp, and writes **four PNG charts** for a calendar day you choose.
 
+It also contains `plot_gc_si_weekly.py`, a separate CLI that writes **weekly variants** of the same four charts for the ISO week (Mon-Fri) containing your `--day`.
+
 ## What gets produced (exactly)
 
 All outputs are named with your `--day` as `YYYY-MM-DD`.
@@ -55,6 +57,21 @@ Default data paths expect **`../gc-si/GC.csv`** and **`../gc-si/SI.csv`** relati
 python gc-si-correlation-graphs/plot_gc_si.py --day 2026-03-10
 ```
 
+**Weekly script (separate from daily):**
+
+```bash
+python gc-si-correlation-graphs/plot_gc_si_weekly.py --day 2026-03-10
+```
+
+This generates:
+
+- `01_gc_si_overlay_weekly_<week>.png`
+- `02_ratio_intraday_weekly_<week>.png`
+- `03_corr_bellcurve_weekly_<week>.png`
+- `04_ratio_and_bellcurve_weekly_<week>.png`
+
+Where `<week>` is `YYYY-Www_MM-DD_to_MM-DD` for the ISO Mon-Fri window containing `--day`.
+
 **Explicit paths:**
 
 ```bash
@@ -87,6 +104,17 @@ python gc-si-correlation-graphs/plot_gc_si.py --day 2026-03-10 --ratio-ylim 75 9
 | `--baseline-year` | Year for YTD lookback when `--lookback-days` is omitted (default: 2026). |
 | `--lookback-days` | If set, use last N trading days before `--day` instead of YTD. |
 | `--ratio-ylim` | Two floats: min and max y for figure 2 only. |
+
+For `plot_gc_si_weekly.py`, only `--day`, `--gc`, `--si`, `--out-dir`, and `--ratio-ylim` apply.
+
+## Weekly behavior details
+
+The weekly script is additive and does not replace daily outputs.
+
+- **Figure 01 and 02 weekly:** still use the original 15-minute bars, but x-axis ticks are day names (`Mon`, `Tue`, ...) placed at the first available bar of each day.
+- **Figure 03 weekly:** "today's correlation" is still the chosen day's daily Pearson correlation (from that day's 15-minute returns). The bell curve uses daily correlations from the *other* days in the same Mon-Fri week.
+- **Figure 04 weekly:** uses the same weekly statistical semantics as weekly figure 03.
+- **Edge cases:** if the week has missing/sparse data, the script still completes. It renders fallback visuals/annotations when correlations cannot be computed with normal sample sizes.
 
 ## Troubleshooting
 
