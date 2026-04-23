@@ -4,6 +4,18 @@ This folder contains `plot_gc_si.py`, a small CLI that reads gold (GC) and silve
 
 It also contains `plot_gc_si_weekly.py`, a separate CLI that writes **weekly variants** of the same four charts for the ISO week (Mon-Fri) containing your `--day`.
 
+It also contains `backtest_gc_si_ratio.py`, a small backtest CLI for a GC mean-reversion strategy driven by the GC/SI ratio.
+
+## Backtest strategy (brief)
+
+- Signal: compute GC/SI ratio (`close_gc / close_si`).
+- Baseline: for each ISO week, compute `mu` and `sigma` from the **prior ISO week's** intraday ratio bars (Mon-Fri), so there is no look-ahead.
+- Entry:
+  - **Sell 1 GC** when ratio `> mu + 2*sigma`
+  - **Buy 1 GC** when ratio `< mu - 2*sigma`
+- Exit: close position at **+$2,000** profit or **-$500** loss (assuming `$100,000` account and 1 GC contract).
+- Output: writes trade ledger CSV with `Date of Trade`, `GC price`, `Si Price`, `Date of Close`, `Profit or Loss`.
+
 ## What gets produced (exactly)
 
 All outputs are named with your `--day` as `YYYY-MM-DD`.
