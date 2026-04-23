@@ -2,9 +2,9 @@
 """
 Backtest a GC strategy driven by GC/SI ratio +/- 2 sigma signals.
 
-Signal baseline matches weekly figure-5 logic:
-- Ratio baseline is built from prior 52 ISO-week mean ratios.
-- For each bar in a week, use mu/sigma from those 52 prior weeks only.
+Signal baseline:
+- For each ISO week, mu/sigma are computed from the prior ISO week's
+  intraday ratio bars only (Mon-Fri).
 
 Strategy:
 - Short 1 GC when ratio > mu + 2*sigma
@@ -28,9 +28,6 @@ GC_MULTIPLIER = 100.0
 DEFAULT_ACCOUNT_VALUE = 100_000.0
 PROFIT_TARGET_PCT = 0.02
 STOP_LOSS_PCT = 0.005
-LOOKBACK_WEEKS = 52
-
-
 @dataclass
 class Position:
     side: int  # +1 long, -1 short
@@ -68,20 +65,28 @@ def parse_args() -> argparse.Namespace:
 def attach_baseline(merged: pd.DataFrame) -> pd.DataFrame:
     weekdays = merged[merged["cal_day"].map(lambda d: d.weekday() <= 4)].copy()
     weekdays["week_start"] = weekdays["cal_day"].map(_iso_week_start)
-
-    weekly_means = _weekly_mean_ratio_series(weekdays)
     baseline_map: dict[date, tuple[float, float]] = {}
 
-    week_starts = sorted(weekdays["week_start"].unique())
-    for wk in week_starts:
-        prior = weekly_means[weekly_means.index < wk].dropna().tail(LOOKBACK_WEEKS)
-        if len(prior) == LOOKBACK_WEEKS:
-            mu = float(np.mean(prior.values))
-            sigma = float(np.std(prior.values, ddof=1))
+    ratio_by_week: dict[date, np.ndarray] = {}
+    for wk, g in weekdays.groupby("week_start", sort=True):
+        ratio_by_week[wk] = g["ratio"].astype(float).values
+
+    week_starts = sorted(ratio_by_week.keys())
+    for i in range(1, len(week_starts)):
+        wk = week_starts[i]
+        prev_wk = week_starts[i - 1]
+        prev_vals = ratio_by_week[prev_wk]
+        if len(prev_vals) >= 2:
+            mu = float(np.mean(prev_vals))
+            sigma = float(np.std(prev_vals, ddof=1))
             baseline_map[wk] = (mu, sigma)
 
-    weekdays["ratio_mu"] = weekdays["week_start"].map(lambda w: baseline_map.get(w, (np.nan, np.nan))[0])
-    weekdays["ratio_sigma"] = weekdays["week_start"].map(lambda w: baseline_map.get(w, (np.nan, np.nan))[1])
+    weekdays["ratio_mu"] = weekdays["week_start"].map(
+        lambda w: baseline_map.get(w, (np.nan, np.nan))[0]
+    )
+    weekdays["ratio_sigma"] = weekdays["week_start"].map(
+        lambda w: baseline_map.get(w, (np.nan, np.nan))[1]
+    )
     return weekdays.sort_values("ts").reset_index(drop=True)
 
 
