@@ -172,10 +172,28 @@ def main() -> None:
     trades = backtest(model_df, account_value=float(args.account_value))
 
     out_csv = args.out_dir / "gc_si_ratio_backtest_results.csv"
+    out_summary_csv = args.out_dir / "gc_si_ratio_backtest_summary.csv"
     trades.to_csv(out_csv, index=False)
 
     stats = summarize(trades)
+    closing_account_value = float(args.account_value) + stats["net_pnl"]
+    summary_row = pd.DataFrame(
+        [
+            {
+                "StartingAccount": float(args.account_value),
+                "Trades": int(stats["trades"]),
+                "WinRate": stats["win_rate"],
+                "NetPnL": stats["net_pnl"],
+                "AvgWin": stats["avg_win"],
+                "AvgLoss": stats["avg_loss"],
+                "MaxDrawdown": stats["max_drawdown"],
+                "ClosingAccount": closing_account_value,
+            }
+        ]
+    )
+    summary_row.to_csv(out_summary_csv, index=False)
     print(f"Wrote trade results: {out_csv.resolve()}")
+    print(f"Wrote summary results: {out_summary_csv.resolve()}")
     print(
         "Summary | "
         f"Trades={int(stats['trades'])} | "
@@ -183,7 +201,8 @@ def main() -> None:
         f"NetPnL=${stats['net_pnl']:,.2f} | "
         f"AvgWin=${stats['avg_win']:,.2f} | "
         f"AvgLoss=${stats['avg_loss']:,.2f} | "
-        f"MaxDrawdown=${stats['max_drawdown']:,.2f}"
+        f"MaxDrawdown=${stats['max_drawdown']:,.2f} | "
+        f"ClosingAccount=${closing_account_value:,.2f}"
     )
 
 
