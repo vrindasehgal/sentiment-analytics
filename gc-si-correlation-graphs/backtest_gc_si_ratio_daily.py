@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """
-Daily-close backtest: GC/SI ratio mean reversion with +/- 2 sigma signals.
+Daily-close backtest: GC/SI ratio +/- 2 sigma signals.
 
 Baseline: prior ISO week's daily ratio samples (GC close / SI close), Mon–Fri.
-Entry: arm when ratio crosses band; enter on the *next* trading day only if still
-       beyond the same threshold (short if still > upper, long if still < lower).
+
+Mean reversion (default): arm when ratio crosses band; enter on the *next* trading
+day only if still beyond the same threshold (short if still > upper, long if
+still < lower).
+
+Continuation (--continuation): long at the same close when ratio > upper; short
+when ratio < lower (no confirmation delay).
+
 Exit: +3% / -1% of starting account value (1 GC, $100 multiplier).
 """
 
@@ -91,7 +97,9 @@ class BacktestResult:
     daily_returns: pd.Series
 
 
-def run_backtest(daily: pd.DataFrame, account_value: float) -> BacktestResult:
+def run_backtest(
+    daily: pd.DataFrame, account_value: float, *, continuation: bool = False
+) -> BacktestResult:
     profit_target = account_value * PROFIT_TARGET_PCT
     stop_loss = account_value * STOP_LOSS_PCT
 
@@ -137,46 +145,65 @@ def run_backtest(daily: pd.DataFrame, account_value: float) -> BacktestResult:
                 pending_side = None
 
         if pos is None:
-            if pending_side is not None:
+            if continuation:
                 if valid_baseline:
-                    if pending_side == -1:
-                        if ratio > upper:
-                            pos = OpenPosition(
-                                side=-1,
-                                entry_idx=i,
-                                entry_date=cal_day,
-                                entry_gc=gc_price,
-                                entry_si=si_price,
-                            )
-                        elif ratio < lower:
-                            pending_side = None
-                            skip_arm_today = True
+                    if ratio > upper:
+                        pos = OpenPosition(
+                            side=1,
+                            entry_idx=i,
+                            entry_date=cal_day,
+                            entry_gc=gc_price,
+                            entry_si=si_price,
+                        )
+                    elif ratio < lower:
+                        pos = OpenPosition(
+                            side=-1,
+                            entry_idx=i,
+                            entry_date=cal_day,
+                            entry_gc=gc_price,
+                            entry_si=si_price,
+                        )
+            else:
+                if pending_side is not None:
+                    if valid_baseline:
+                        if pending_side == -1:
+                            if ratio > upper:
+                                pos = OpenPosition(
+                                    side=-1,
+                                    entry_idx=i,
+                                    entry_date=cal_day,
+                                    entry_gc=gc_price,
+                                    entry_si=si_price,
+                                )
+                            elif ratio < lower:
+                                pending_side = None
+                                skip_arm_today = True
+                            else:
+                                pending_side = None
                         else:
-                            pending_side = None
+                            if ratio < lower:
+                                pos = OpenPosition(
+                                    side=1,
+                                    entry_idx=i,
+                                    entry_date=cal_day,
+                                    entry_gc=gc_price,
+                                    entry_si=si_price,
+                                )
+                            elif ratio > upper:
+                                pending_side = None
+                                skip_arm_today = True
+                            else:
+                                pending_side = None
                     else:
-                        if ratio < lower:
-                            pos = OpenPosition(
-                                side=1,
-                                entry_idx=i,
-                                entry_date=cal_day,
-                                entry_gc=gc_price,
-                                entry_si=si_price,
-                            )
-                        elif ratio > upper:
-                            pending_side = None
-                            skip_arm_today = True
-                        else:
-                            pending_side = None
-                else:
-                    pending_side = None
-                if pos is not None:
-                    pending_side = None
+                        pending_side = None
+                    if pos is not None:
+                        pending_side = None
 
-            if pos is None and pending_side is None and valid_baseline and not skip_arm_today:
-                if ratio > upper:
-                    pending_side = -1
-                elif ratio < lower:
-                    pending_side = 1
+                if pos is None and pending_side is None and valid_baseline and not skip_arm_today:
+                    if ratio > upper:
+                        pending_side = -1
+                    elif ratio < lower:
+                        pending_side = 1
 
         if pos is not None:
             unreal = (gc_price - pos.entry_gc) * GC_MULTIPLIER * pos.side
@@ -325,11 +352,18 @@ def summarize_by_year(
 
 def parse_args() -> argparse.Namespace:
     root, data_dir = _default_paths()
-    p = argparse.ArgumentParser(description="Daily GC/SI ratio mean-reversion backtest.")
+    p = argparse.ArgumentParser(
+        description="Daily GC/SI ratio backtest (mean reversion or continuation breakout)."
+    )
     p.add_argument("--gc", type=Path, default=data_dir / "GC.csv")
     p.add_argument("--si", type=Path, default=data_dir / "SI.csv")
     p.add_argument("--out-dir", type=Path, default=root / "results")
     p.add_argument("--account-value", type=float, default=DEFAULT_ACCOUNT_VALUE)
+    p.add_argument(
+        "--continuation",
+        action="store_true",
+        help="Breakout mode: long above +2σ / short below −2σ at same close (no 1-day delay).",
+    )
     return p.parse_args()
 
 
@@ -345,10 +379,18 @@ def main() -> None:
     daily_raw = aggregate_daily_closes(merged)
     daily = attach_baseline_daily(daily_raw)
 
-    result = run_backtest(daily, account_value=float(args.account_value))
+    result = run_backtest(
+        daily,
+        account_value=float(args.account_value),
+        continuation=bool(args.continuation),
+    )
 
-    trades_path = args.out_dir / "gc_si_ratio_daily_trades.csv"
-    yearly_path = args.out_dir / "gc_si_ratio_daily_by_year.csv"
+    if args.continuation:
+        trades_path = args.out_dir / "gc_si_ratio_daily_continuation_trades.csv"
+        yearly_path = args.out_dir / "gc_si_ratio_daily_continuation_by_year.csv"
+    else:
+        trades_path = args.out_dir / "gc_si_ratio_daily_trades.csv"
+        yearly_path = args.out_dir / "gc_si_ratio_daily_by_year.csv"
 
     result.trades.to_csv(trades_path, index=False)
     by_year = summarize_by_year(result.trades, result.equity_series, result.daily_returns)
