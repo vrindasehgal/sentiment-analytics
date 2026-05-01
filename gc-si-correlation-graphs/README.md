@@ -6,6 +6,8 @@ It also contains `plot_gc_si_weekly.py`, a separate CLI that writes **weekly var
 
 It also contains `backtest_gc_si_ratio.py`, a small backtest CLI for a GC mean-reversion strategy driven by the GC/SI ratio.
 
+It also contains `backtest_gc_si_ratio_daily.py`, a **daily-close** variant: last bar of each session defines the GC/SI ratio, prior ISO week’s **daily** ratios set μ/σ, a **one-trading-day confirmation** is required after a signal, and exits use **+3% / −1%** of starting account value (default \$100k). It writes `gc_si_ratio_daily_trades.csv` and `gc_si_ratio_daily_by_year.csv` (metrics by exit year, including Sharpe, Sortino, Calmar, and drawdown on a simulated daily equity curve).
+
 ## Backtest strategy (brief)
 
 - Signal: compute GC/SI ratio (`close_gc / close_si`).
@@ -15,6 +17,10 @@ It also contains `backtest_gc_si_ratio.py`, a small backtest CLI for a GC mean-r
   - **Buy 1 GC** when ratio `< mu - 2*sigma`
 - Exit: close position at **+$2,000** profit or **-$500** loss (assuming `$100,000` account and 1 GC contract).
 - Output: writes trade ledger CSV with `Date of Trade`, `GC price`, `Si Price`, `Date of Close`, `Profit or Loss`.
+
+**Daily backtest** (`backtest_gc_si_ratio_daily.py`): run from repo root with default paths, e.g.  
+`python gc-si-correlation-graphs/backtest_gc_si_ratio_daily.py --out-dir gc-si-correlation-graphs/results`  
+Flags: `--gc`, `--si`, `--out-dir`, `--account-value`.
 
 ## What gets produced (exactly)
 
