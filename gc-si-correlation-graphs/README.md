@@ -22,6 +22,14 @@ It also contains `backtest_gc_si_ratio_daily.py`, a **daily-close** variant: las
 `python gc-si-correlation-graphs/backtest_gc_si_ratio_daily.py --out-dir gc-si-correlation-graphs/results`  
 Continuation breakout: add `--continuation`. Flags: `--gc`, `--si`, `--out-dir`, `--account-value`, `--continuation`.
 
+**Daily reversion timing** (`analyze_gc_si_ratio_reversion_daily.py`): event study (no PnL). For each trigger band μ ± kσ (default k = 1.5 and 2.0), records when the session-close ratio **exits** the band and how many trading days until it **returns inside** the same band. Baseline matches the daily backtest (prior ISO week’s daily ratios). `DurationDays` = revert index − cross index (e.g. cross Mon, revert Wed → 2 days). Outputs in `results/`: `gc_si_ratio_reversion_daily_events.csv`, `gc_si_ratio_reversion_daily_summary.csv` (mean/median/percentiles by trigger and direction), `gc_si_ratio_reversion_daily_by_year.csv`.
+
+```bash
+python gc-si-correlation-graphs/analyze_gc_si_ratio_reversion_daily.py --out-dir gc-si-correlation-graphs/results
+```
+
+Flags: `--gc`, `--si`, `--out-dir`, `--trigger-sigmas` (default `1.5 2.0`).
+
 ## What gets produced (exactly)
 
 All outputs are named with your `--day` as `YYYY-MM-DD`.
