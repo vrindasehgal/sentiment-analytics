@@ -30,6 +30,20 @@ python gc-si-correlation-graphs/analyze_gc_si_ratio_reversion_daily.py --out-dir
 
 Flags: `--gc`, `--si`, `--out-dir`, `--trigger-sigmas` (default `1.5 2.0`).
 
+**GC/SI spread backtests** (`backtest_gc_si_spread.py` + `run_backtest_gc_si_spread_sweep.py`): dollar-neutral mean-reversion spread on daily closes. Signal when ratio exits μ ± kσ (k = 1.5 or 2.0; prior ISO week daily baseline). **Ratio high** → sell GC + buy SI; **ratio low** → buy GC + sell SI (both legs on entry day). Exit flat when combined spread PnL hits profit/stop **or** at entry + N trading days (calendar backstop; profit/stop checked first). Sizing: 1 GC contract; `si_contracts = (P_gc × 100) / (P_si × 5000)`. Reward:risk on $100k account — 1:3 (+3%/−1%), 1:2, 1:1, 1:5. One position at a time; skipped signals logged.
+
+- **Backtest A (`probable_duration`):** enter on signal day; N ∈ {1, 2, 3, 5}
+- **Backtest B (`wait_entry`):** enter 1–2 days after signal; close N ∈ {1, 2} days after entry
+
+```bash
+python gc-si-correlation-graphs/run_backtest_gc_si_spread_sweep.py \
+  --mode probable_duration --out-dir gc-si-correlation-graphs/results/spread_backtest
+python gc-si-correlation-graphs/run_backtest_gc_si_spread_sweep.py \
+  --mode wait_entry --out-dir gc-si-correlation-graphs/results/spread_backtest
+```
+
+Outputs per mode under `results/spread_backtest/<mode>/`: `sweep_summary.csv`, `trades.csv`, `skipped_signals.csv`, `by_year.csv`.
+
 ## What gets produced (exactly)
 
 All outputs are named with your `--day` as `YYYY-MM-DD`.
