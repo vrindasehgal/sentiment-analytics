@@ -44,6 +44,66 @@ python gc-si-correlation-graphs/run_backtest_gc_si_spread_sweep.py \
 
 Outputs per mode under `results/spread_backtest/<mode>/`: `sweep_summary.csv`, `trades.csv`, `skipped_signals.csv`, `by_year.csv`.
 
+**Extended delay sweep (Phase 1)** (`run_backtest_gc_si_spread_sweep_extended.py`): wider timing grids with baseline 1× sizing.
+
+- **probable_duration:** `entry_lag ∈ {0,1,2,3,5}`, `calendar_n ∈ {1,2,3,5,6,7,8,10}`
+- **wait_entry:** `entry_lag ∈ {1..6}`, `calendar_n ∈ {1..6}`
+
+```bash
+python gc-si-correlation-graphs/run_backtest_gc_si_spread_sweep_extended.py \
+  --out-dir gc-si-correlation-graphs/results/spread_backtest_extended
+```
+
+Outputs per mode: `sweep_summary.csv`, `trades.csv`, `skipped_signals.csv`, `by_year.csv`, **`by_month.csv`** (trades/wins/losses/win rate/streaks per exit month), **`top_configs.csv`** (top timing configs by Sharpe for Phase 2).
+
+**Adaptive risk (Phase 2)** (`run_backtest_gc_si_spread_adaptive.py`): runs baseline vs adaptive on `top_configs.csv` from Phase 1.
+
+| Rule | Behavior |
+|------|----------|
+| Scale up | Month-to-date win rate > 50% with ≥ 2 closed trades → **1.5×** next entry |
+| Scale down | Exactly 1 consecutive loss → **0.5×** next entry (min with scale-up) |
+| Cooling-off | 2 consecutive losses → skip entries until next calendar month |
+
+```bash
+python gc-si-correlation-graphs/run_backtest_gc_si_spread_adaptive.py \
+  --extended-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk/phase1_extended \
+  --out-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk/phase2_adaptive \
+  --summary-out-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk
+```
+
+Phase 2 runs adaptive risk on **`extended_delay_best`** timing configs (one best lag/N per trigger σ from the full Phase 1 sweep), not only `top_configs.csv`. Use `--config-source top_configs` to restore the old behavior.
+
+Outputs per mode: `sweep_summary_adaptive.csv` (baseline vs adaptive), `trades_adaptive.csv`, `skipped_signals_adaptive.csv`, `by_month_adaptive.csv`.
+
+**Consolidated results summary** (`results_summary.csv`): narrative table (like reversion-study `*_summary.csv`) comparing original vs extended delays, monthly streak patterns, reversion alignment, and adaptive vs baseline deltas.
+
+| `SummarySection` | Contents |
+|------------------|----------|
+| `extended_delay_best` | Best config per mode + trigger on full extended grid; includes `SharpeVsOriginal`, `NetPnLVsOriginal`, `MedianReversionDays`, `CalendarNMinusMedianReversion` |
+| `original_delay_best` | Best config on **original** delay grid only |
+| `extended_delay_new_only` | Best among **newly added** delay values |
+| `delay_curve` | Side-by-side Sharpe/NetPnL at 4 representative entry lags (best CalendarN per lag); `*` = curve peak, `†` = extended best |
+| `monthly_patterns` | Rolled-up monthly win/loss streak stats for each extended-delay best config (`MonthsAllWins`, `MonthsAllLosses`, `MonthsMixed`, …) |
+| `overall_best` | Single best row per mode |
+| `adaptive_vs_baseline` | Paired rows with `DeltaNetPnL`, `DeltaMaxDrawdown`, `DeltaSharpe`, `DeltaWinRate` |
+
+Sweep metrics also include **`AvgWinPctOfAccount`** and **`AvgLossPctOfAccount`** (average win/loss as a fraction of the $100k account).
+
+**Month patterns report** (`month_patterns_summary.csv`): per-config counts of all-win, all-loss, and mixed months. Written under each mode in the summary output directory.
+
+**Delay curve report** (`delay_curve_summary.csv`): per mode/trigger, best CalendarN at entry lags **0/1/2/5** (probable_duration) or **1/2/4/6** (wait_entry), using the extended-best reward:risk ratio. Shows whether Sharpe improves monotonically or peaks mid-curve.
+
+Written automatically to `results/spread_delays_adaptive_risk/results_summary.csv` after Phase 2, and to the Phase 1 out dir after the extended sweep. Rebuild without re-running backtests:
+
+```bash
+python gc-si-correlation-graphs/build_spread_results_summary.py \
+  --extended-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk/phase1_extended \
+  --adaptive-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk/phase2_adaptive \
+  --out-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk
+```
+
+Use `--phase1-only` to omit `adaptive_vs_baseline` rows.
+
 ## What gets produced (exactly)
 
 All outputs are named with your `--day` as `YYYY-MM-DD`.
