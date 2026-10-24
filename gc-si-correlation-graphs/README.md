@@ -2,7 +2,7 @@
 
 Does the gold/silver price ratio mean-revert, and does a dollar-neutral spread around that reversion make money on daily closes?
 
-The published numbers below come from 15-minute gold (GC) and silver (SI) bars covering **11 Aug 2016 through 11 Mar 2026**. Those raw files are not in this repository. The tables in `results/` are the study output.
+The published numbers below come from 15-minute gold (GC) and silver (SI) bars covering **11 Aug 2016 through 11 Mar 2026**. Raw files are not in this repo. The tables in `results/` are the study output.
 
 ## Data
 
@@ -59,7 +59,7 @@ The weekly script takes `--day`, `--gc`, `--si`, `--out-dir`, and `--ratio-ylim`
 
 ## Reversion study
 
-`analyze_gc_si_ratio_reversion_daily.py` does not compute PnL. For each session it builds μ and σ from the prior ISO week’s daily ratios. An event starts when the ratio leaves the band μ ± kσ (k = 1.5 or 2.0) and ends at the first later close back inside that same band.
+`analyze_gc_si_ratio_reversion_daily.py`: For each session it builds μ and σ from the prior ISO week’s daily ratios. An event starts when the ratio leaves the band μ ± kσ (k = 1.5 or 2.0) and ends at the first later close back inside that same band.
 
 `DurationDays` is the revert index minus the cross index. A cross on Monday that is back inside on Wednesday is 2 days.
 
