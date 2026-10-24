@@ -1,8 +1,8 @@
 # Gold headline extraction
 
-This folder builds a checked set of English-language gold-price headlines (Corpus A) and flags the subset that contains a fixed list of bullish and bearish phrases (Corpus B). Corpus B is not a second file. It is `kw_flag == 1` on `corpus_a.csv`.
+This folder builds a checked set of English-language gold-price headlines (Corpus A) and flags the subset that contains a fixed list of bullish and bearish phrases (Corpus B). Note: Corpus B is not a second file. It is `kw_flag == 1` on `corpus_a.csv`.
 
-There is no sentiment score here. The output is the headline, the time GDELT recorded it, the source, and the phrase flag.
+The output is the headline, the time GDELT recorded it, the source, and the phrase flag.
 
 The committed corpus has **6,557 headlines** from **10 May 2026 through 18 Oct 2026**, across **821 domains**. **223** of them (3.4%) match at least one phrase. **5,064** duplicate-groups cover those rows: syndicated copies of the same headline on the same day are kept and share an id.
 
@@ -20,7 +20,7 @@ ArtList is a recent window, on the order of the last few months. The file in thi
 
 ## What gets dropped, and what gets kept
 
-Corpus A drops Indian gold-market copy and then keeps everything else, including syndicated duplicates.
+Corpus A drops Indian gold-market copy and then keeps everything else (including syndicated duplicates).
 
 Headline exclusions are case-insensitive. `india`, `indian`, `indians`, `rs` as a whole word, `mcx`, `rupee`, `inr`, `sensex`, `nifty`, `mumbai`, `delhi`, `chennai`, `pune`, `hyderabad`, and the rupee sign `₹`.
 
