@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 GDELT Gold-Price Headline Extraction  —  Research Task 1
-========================================================
+
 OBJECTIVE
   Produce a verified dataset of English-language gold-PRICE news headlines over a
   ~3-month window (Corpus A), each paired to its exact publication timestamp and
@@ -47,7 +47,7 @@ QUERY = '("gold price" OR "gold prices" OR "gold bullion") sourcelang:english'
 
 GOLD_TERMS = ["gold", "bullion", "xau"]      # for Step-8 keyword sanity check
 
-# ---- Rev 15 keyword dictionary (Memo_Vrinda_HCGSS_Rev15.docx): 23 bullish + 23 bearish ----
+# Rev 15 keyword dictionary (Memo_Vrinda_HCGSS_Rev15.docx): 23 bullish + 23 bearish 
 REV15_TERMS = [
     # bullish
     "dovish fed", "weakening dollar", "weak dollar", "weaker dollar", "quantitative easing",
@@ -92,8 +92,8 @@ def is_excluded_domain(domain):
     return any(token in d for token in EXCLUDE_DOMAINS)
 
 
-# ---- Shared matching rule (memo section 3): exact-phrase, word-boundary, case-insensitive ----
-# This is the SINGLE source of truth for term matching. The future scorer MUST reuse
+# Shared matching rule (memo section 3): exact-phrase, word-boundary, case-insensitive 
+# Single source of truth for term matching. Future scorer needs to reuse this
 # match_rev15_terms so a flagged headline can never score zero from a rule mismatch.
 _REV15_RES = [(t, re.compile(r"\b" + re.escape(t) + r"\b", re.IGNORECASE)) for t in REV15_TERMS]
 
@@ -108,7 +108,7 @@ def match_rev15_terms(headline):
     return [t for t, rx in _REV15_RES if rx.search(h)]
 
 
-# ----------------------------- Step 2/3: fetch -----------------------------
+# Step 2,3: fetch headlines
 def fetch_page(win_start, win_end, session, retries=8):
     params = {
         "query": QUERY, "mode": "ArtList", "format": "json",
@@ -179,7 +179,7 @@ def fetch_all(start, end, step_hours=24, sleep_s=5.0):
     return pd.DataFrame(all_rows), pd.DataFrame(coverage)
  
  
-# --------------------- Step 5/6: normalize + group -------------------------
+# Steps 5, 6: normalize + group duplicates
 def _norm_key(h):
     if not isinstance(h, str):
         return ""
@@ -226,7 +226,7 @@ def flag_keywords(df):
     return df
  
  
-# --------------------------- Step 8: verify -------------------------------
+# Step 8: verify
 def verify(df, raw_n, excluded, dup_rows, coverage, start, end):
     print("\n================ STEP 8 — VERIFICATION ================")
     print(f"  raw rows fetched          : {raw_n}")
@@ -305,7 +305,6 @@ def append_coverage(path, new_cov):
     return combined
 
 
-# --------------------------------- main -----------------------------------
 def main():
     default_start = datetime.strptime(START_DATE, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     default_end = datetime.strptime(END_DATE, "%Y-%m-%d").replace(tzinfo=timezone.utc)
