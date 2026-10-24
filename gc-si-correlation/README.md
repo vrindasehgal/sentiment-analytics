@@ -22,7 +22,7 @@ A **session close** in the daily studies is the last merged bar of that calendar
 Install:
 
 ```bash
-pip install -r gc-si-correlation-graphs/requirements-plot.txt
+pip install -r gc-si-correlation/requirements-plot.txt
 ```
 
 Python 3.10+ (the scripts use `list[str]` and similar). Run commands from the repository root. Pandas and Matplotlib are enough; the backtests also import NumPy, which those packages already pull in.
@@ -44,15 +44,15 @@ GC `SeqClose` on the left axis, SI `SeqClose` on the right. The weekly chart dro
 ![GC/SI ratio, week of 9 Feb 2026](results/plots/02_ratio_intraday_weekly_2026-W07_02-09_to_02-13.png)
 
 ```bash
-python gc-si-correlation-graphs/plot_gc_si.py --day 2026-02-11
-python gc-si-correlation-graphs/plot_gc_si_weekly.py --day 2026-02-11
+python gc-si-correlation/plot_gc_si.py --day 2026-02-11
+python gc-si-correlation/plot_gc_si_weekly.py --day 2026-02-11
 ```
 
 | Flag | Role |
 |------|------|
 | `--day` | Required. `YYYY-MM-DD`. |
 | `--gc`, `--si` | CSV paths. |
-| `--out-dir` | PNG directory. Default `gc-si-correlation-graphs/plots/`. |
+| `--out-dir` | PNG directory. Default `gc-si-correlation/plots/`. |
 | `--ratio-ylim` | Two floats. Figure 2 only. |
 
 The weekly script takes `--day`, `--gc`, `--si`, `--out-dir`, and `--ratio-ylim`.
@@ -77,8 +77,8 @@ Every event in this sample reverted. Nothing was still outside the band at the e
 Upper means the ratio exited above μ + kσ. Lower means it exited below μ − kσ. The 2σ trips come back sooner than the 1.5σ trips (median 2 days versus 3). The right tail is long: a 1.5σ upper excursion lasted 22 trading days.
 
 ```bash
-python gc-si-correlation-graphs/analyze_gc_si_ratio_reversion_daily.py \
-  --out-dir gc-si-correlation-graphs/results
+python gc-si-correlation/analyze_gc_si_ratio_reversion_daily.py \
+  --out-dir gc-si-correlation/results
 ```
 
 `--trigger-sigmas` defaults to `1.5 2.0`.
@@ -165,20 +165,20 @@ On these two configs, adaptive sizing cut net PnL (by about $133,000 and about $
 These commands need the local CSVs. They rewrite files under `results/`, including trade ledgers that this repository does not track.
 
 ```bash
-python gc-si-correlation-graphs/run_backtest_gc_si_spread_sweep.py \
+python gc-si-correlation/run_backtest_gc_si_spread_sweep.py \
   --mode probable_duration \
-  --out-dir gc-si-correlation-graphs/results/spread_backtest
-python gc-si-correlation-graphs/run_backtest_gc_si_spread_sweep.py \
+  --out-dir gc-si-correlation/results/spread_backtest
+python gc-si-correlation/run_backtest_gc_si_spread_sweep.py \
   --mode wait_entry \
-  --out-dir gc-si-correlation-graphs/results/spread_backtest
+  --out-dir gc-si-correlation/results/spread_backtest
 
-python gc-si-correlation-graphs/run_backtest_gc_si_spread_sweep_extended.py \
-  --out-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk/phase1_extended
+python gc-si-correlation/run_backtest_gc_si_spread_sweep_extended.py \
+  --out-dir gc-si-correlation/results/spread_delays_adaptive_risk/phase1_extended
 
-python gc-si-correlation-graphs/run_backtest_gc_si_spread_adaptive.py \
-  --extended-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk/phase1_extended \
-  --out-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk/phase2_adaptive \
-  --summary-out-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk
+python gc-si-correlation/run_backtest_gc_si_spread_adaptive.py \
+  --extended-dir gc-si-correlation/results/spread_delays_adaptive_risk/phase1_extended \
+  --out-dir gc-si-correlation/results/spread_delays_adaptive_risk/phase2_adaptive \
+  --summary-out-dir gc-si-correlation/results/spread_delays_adaptive_risk
 ```
 
 Phase 2 reads the full Phase 1 sweep and picks the best lag and hold per trigger (`--config-source extended_delay_best`). `--config-source top_configs` uses `top_configs.csv` instead.
@@ -186,10 +186,10 @@ Phase 2 reads the full Phase 1 sweep and picks the best lag and hold per trigger
 Rebuild `results_summary.csv` without rerunning the backtests:
 
 ```bash
-python gc-si-correlation-graphs/build_spread_results_summary.py \
-  --extended-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk/phase1_extended \
-  --adaptive-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk/phase2_adaptive \
-  --out-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk
+python gc-si-correlation/build_spread_results_summary.py \
+  --extended-dir gc-si-correlation/results/spread_delays_adaptive_risk/phase1_extended \
+  --adaptive-dir gc-si-correlation/results/spread_delays_adaptive_risk/phase2_adaptive \
+  --out-dir gc-si-correlation/results/spread_delays_adaptive_risk
 ```
 
 `--phase1-only` drops the adaptive comparison.
@@ -203,9 +203,9 @@ Two earlier scripts trade one GC contract and ignore the silver leg except as th
 `backtest_gc_si_ratio_daily.py` uses session closes and the prior week’s daily ratios. The default waits one trading day and enters only if the ratio is still outside the same band. `--continuation` enters at the signal close and flips the direction: long above +2σ, short below −2σ. Exit is +3% or −1% of the account.
 
 ```bash
-python gc-si-correlation-graphs/backtest_gc_si_ratio.py --out-dir gc-si-correlation-graphs/results
-python gc-si-correlation-graphs/backtest_gc_si_ratio_daily.py --out-dir gc-si-correlation-graphs/results
-python gc-si-correlation-graphs/backtest_gc_si_ratio_daily.py --continuation --out-dir gc-si-correlation-graphs/results
+python gc-si-correlation/backtest_gc_si_ratio.py --out-dir gc-si-correlation/results
+python gc-si-correlation/backtest_gc_si_ratio_daily.py --out-dir gc-si-correlation/results
+python gc-si-correlation/backtest_gc_si_ratio_daily.py --continuation --out-dir gc-si-correlation/results
 ```
 
 ## Assumptions

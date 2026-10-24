@@ -6,7 +6,7 @@ CSV inputs live in ../gc-si/ by default (GC.csv, SI.csv).
 
 Install: pip install -r requirements-plot.txt  (pandas, matplotlib).
 
-  python gc-si-correlation-graphs/plot_gc_si.py --day 2026-01-02 --out-dir gc-si-correlation-graphs/plots
+  python gc-si-correlation/plot_gc_si.py --day 2026-01-02 --out-dir gc-si-correlation/plots
 
 Bell-curve baseline: by default, all trading days in --baseline-year from Jan 1 up to (not including)
 --day. Override with --lookback-days N for the last N days before --day.

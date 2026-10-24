@@ -9,8 +9,8 @@ __pycache__/
 gc-si/
 
 # Generated backtest output. Curated summaries and example charts are force-added.
-gc-si-correlation-graphs/results/
-gc-si-correlation-graphs/__pycache__/
+gc-si-correlation/results/
+gc-si-correlation/__pycache__/
 
 # Bulky ledgers, in case a results path is force-added.
 *trades*.csv
