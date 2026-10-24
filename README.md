@@ -4,7 +4,7 @@
 ## Gold/silver ratio
 
 Charts, reversion-timing study, and a daily-close spread backtest for the gold/silver price ratio. 
-[gc-si-correlation-graphs](gc-si-correlation-graphs/)
+[gc-si-correlation](gc-si-correlation/)
 
 ## Gold headlines
 
