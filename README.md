@@ -1,11 +1,9 @@
 # Sentiment analytics
 
-Two separate studies. Each folder stands on its own.
 
-## Gold and silver
+## Gold/silver ratio
 
-Charts, a reversion-timing study, and a daily-close spread backtest for the gold/silver price ratio. The results are in the folder. The raw price files are not.
-
+Charts, reversion-timing study, and a daily-close spread backtest for the gold/silver price ratio. 
 [gc-si-correlation-graphs](gc-si-correlation-graphs/)
 
 ## Gold headlines
