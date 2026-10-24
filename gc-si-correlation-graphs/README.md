@@ -29,9 +29,7 @@ Python 3.10+ (the scripts use `list[str]` and similar). Run commands from the re
 
 ## Charts
 
-`plot_gc_si.py` writes four PNGs for one session. `plot_gc_si_weekly.py` writes the same four for the ISO Monday–Friday week that contains `--day`. The pictures below are the weekly set for **2026-W07 (9–13 Feb 2026)**.
-
-Daily correlation is the Pearson correlation of intraday percent-change returns that day. A day needs at least 8 aligned bars or it is left out of the correlation sample. Figure 4’s rolling series uses a 20-bar window (about five hours). The KDE is a small Gaussian kernel inside the script (Silverman bandwidth), not SciPy.
+`plot_gc_si.py` writes the price overlay and the intraday ratio for one session. `plot_gc_si_weekly.py` writes the same two for the ISO Monday–Friday week that contains `--day`. The pictures below are the weekly set for **2026-W07 (9–13 Feb 2026)**.
 
 ### 1. Price overlay
 
@@ -45,20 +43,6 @@ GC `SeqClose` on the left axis, SI `SeqClose` on the right. The weekly chart dro
 
 ![GC/SI ratio, week of 9 Feb 2026](results/plots/02_ratio_intraday_weekly_2026-W07_02-09_to_02-13.png)
 
-### 3. Correlation distribution
-
-Histogram of the correlation sample, with an optional KDE. Vertical lines mark μ, ±1σ, ±2σ, ±3σ, and that day’s correlation. The text box is μ, σ, today’s correlation, and its z-score.
-
-On the daily script the sample is prior trading days: year-to-date in `--baseline-year` (default 2026) through the day before `--day`, or the last N days if you pass `--lookback-days`. On the weekly script the sample is 15-minute rolling correlations from the other days of that week, and the marker is still that day’s daily correlation.
-
-![Correlation distribution, week of 9 Feb 2026](results/plots/03_corr_bellcurve_weekly_2026-W07_02-09_to_02-13.png)
-
-### 4. Rolling correlation and the same distribution
-
-Bottom axis: rolling intraday correlation versus time, with horizontal lines at μ, ±1/2/3σ, and today’s daily correlation. Top axis: the KDE from figure 3, drawn for shape. The filename still says `ratio_and_bellcurve`; the chart is the correlation, not the price ratio.
-
-![Rolling correlation and distribution, week of 9 Feb 2026](results/plots/04_ratio_and_bellcurve_weekly_2026-W07_02-09_to_02-13.png)
-
 ```bash
 python gc-si-correlation-graphs/plot_gc_si.py --day 2026-02-11
 python gc-si-correlation-graphs/plot_gc_si_weekly.py --day 2026-02-11
@@ -69,8 +53,6 @@ python gc-si-correlation-graphs/plot_gc_si_weekly.py --day 2026-02-11
 | `--day` | Required. `YYYY-MM-DD`. |
 | `--gc`, `--si` | CSV paths. |
 | `--out-dir` | PNG directory. Default `gc-si-correlation-graphs/plots/`. |
-| `--baseline-year` | Daily script only. Year-to-date window when `--lookback-days` is omitted. Default 2026. |
-| `--lookback-days` | Daily script only. Last N trading days before `--day`. |
 | `--ratio-ylim` | Two floats. Figure 2 only. |
 
 The weekly script takes `--day`, `--gc`, `--si`, `--out-dir`, and `--ratio-ylim`.
@@ -240,7 +222,7 @@ python gc-si-correlation-graphs/backtest_gc_si_ratio_daily.py --continuation --o
 
 | Path | What it is |
 |------|------------|
-| `plot_gc_si.py`, `plot_gc_si_weekly.py` | The four charts |
+| `plot_gc_si.py`, `plot_gc_si_weekly.py` | Price overlay and intraday ratio |
 | `analyze_gc_si_ratio_reversion_daily.py` | Reversion timing, no PnL |
 | `backtest_gc_si_ratio.py`, `backtest_gc_si_ratio_daily.py` | Single-leg GC backtests |
 | `backtest_gc_si_spread.py` | Spread engine |
@@ -251,4 +233,4 @@ python gc-si-correlation-graphs/backtest_gc_si_ratio_daily.py --continuation --o
 | `results/reversion_duration_backtest/gc_si_ratio_reversion_daily_summary.csv` | Reversion table |
 | `results/spread_delays_adaptive_risk/results_summary.csv` | Spread narrative table |
 | `results/spread_delays_adaptive_risk/phase2_adaptive/` | Baseline versus adaptive |
-| `results/plots/01`–`04` `...weekly_2026-W07...png` | Example charts |
+| `results/plots/01`–`02` `...weekly_2026-W07...png` | Example charts |
