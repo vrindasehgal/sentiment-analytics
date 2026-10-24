@@ -1,5 +1,23 @@
-gc-si-correlation-graphs/results/
-gc-si-correlation-graphs/__pycache__/
+.DS_Store
+__pycache__/
 *.py[cod]
 *.pdf
+*.docx
 *.zip
+
+# Raw GC/SI bars stay local.
+gc-si/
+
+# Generated backtest output. Curated summaries and example charts are force-added.
+gc-si-correlation-graphs/results/
+gc-si-correlation-graphs/__pycache__/
+
+# Bulky ledgers, in case a results path is force-added.
+*trades*.csv
+*skipped*.csv
+*_events.csv
+
+# Headline study leftovers (memos, one-off purge, prior extractor output).
+gold_headline_sentiment/documents/
+gold_headline_sentiment/headlines_LEGACY.csv
+gold_headline_sentiment/remove_india_leftovers_REDUNDANT.py

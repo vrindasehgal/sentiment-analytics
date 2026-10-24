@@ -1,99 +1,207 @@
-# GC–SI correlation graphs
+# Gold / silver ratio
 
-This folder contains `plot_gc_si.py`, a small CLI that reads gold (GC) and silver (SI) intraday bar CSVs, merges them on timestamp, and writes **four PNG charts** for a calendar day you choose.
+Does the gold/silver price ratio mean-revert, and does a dollar-neutral spread around that reversion make money on daily closes?
 
-It also contains `plot_gc_si_weekly.py`, a separate CLI that writes **weekly variants** of the same four charts for the ISO week (Mon-Fri) containing your `--day`.
+The published numbers below come from 15-minute gold (GC) and silver (SI) bars covering **11 Aug 2016 through 11 Mar 2026**. Those raw files are not in this repository. The tables in `results/` are the study output.
 
-It also contains `backtest_gc_si_ratio.py`, a small backtest CLI for a GC mean-reversion strategy driven by the GC/SI ratio.
+## Data
 
-It also contains `backtest_gc_si_ratio_daily.py`, a **daily-close** variant: last bar of each session defines the GC/SI ratio; prior ISO week’s **daily** ratios set μ/σ; exits use **+3% / −1%** of starting account value (default \$100k). **Mean reversion (default):** one-trading-day confirmation after a signal. **Continuation (`--continuation`):** long when ratio is above +2σ and short when below −2σ at the **same** session close (no confirmation delay). Outputs: `gc_si_ratio_daily_trades.csv` / `gc_si_ratio_daily_by_year.csv`, or with `--continuation` the `_continuation_` filenames; yearly tables include win/loss ratio, avg gain/loss, durations, consecutive streaks, Sharpe, Sortino, Calmar, and drawdown.
+Scripts expect two CSVs with the same columns and matching timestamps. The default paths are `../gc-si/GC.csv` and `../gc-si/SI.csv` (a `gc-si/` folder next to this one). Pass `--gc` and `--si` to point elsewhere.
 
-## Backtest strategy (brief)
+| Column | Role |
+|--------|------|
+| `Year`, `Month`, `Day` | Calendar date |
+| `HourOfDay`, `MinOfHour` | Bar time. Bars are 15 minutes. |
+| `SeqOpen`, `SeqHigh`, `SeqLow`, `SeqClose` | OHLC for that bar. Charts and backtests use `SeqClose`. |
+| `DayOfWeek`, `output`, `outputC` | Present in the source files. Unused. |
 
-- Signal: compute GC/SI ratio (`close_gc / close_si`).
-- Baseline: for each ISO week, compute `mu` and `sigma` from the **prior ISO week's** intraday ratio bars (Mon-Fri), so there is no look-ahead.
-- Entry:
-  - **Sell 1 GC** when ratio `> mu + 2*sigma`
-  - **Buy 1 GC** when ratio `< mu - 2*sigma`
-- Exit: close position at **+$2,000** profit or **-$500** loss (assuming `$100,000` account and 1 GC contract).
-- Output: writes trade ledger CSV with `Date of Trade`, `GC price`, `Si Price`, `Date of Close`, `Profit or Loss`.
+GC and SI are inner-joined on `Year, Month, Day, HourOfDay, MinOfHour`. A bar that exists in only one file is dropped. The ratio is `close_gc / close_si`.
 
-**Daily backtest** (`backtest_gc_si_ratio_daily.py`): run from repo root with default paths, e.g.  
-`python gc-si-correlation-graphs/backtest_gc_si_ratio_daily.py --out-dir gc-si-correlation-graphs/results`  
-Continuation breakout: add `--continuation`. Flags: `--gc`, `--si`, `--out-dir`, `--account-value`, `--continuation`.
+A **session close** in the daily studies is the last merged bar of that calendar day. The baseline for μ and σ is the prior ISO week (Monday–Friday) only, so the signal day is not inside its own mean and standard deviation.
 
-**Daily reversion timing** (`analyze_gc_si_ratio_reversion_daily.py`): event study (no PnL). For each trigger band μ ± kσ (default k = 1.5 and 2.0), records when the session-close ratio **exits** the band and how many trading days until it **returns inside** the same band. Baseline matches the daily backtest (prior ISO week’s daily ratios). `DurationDays` = revert index − cross index (e.g. cross Mon, revert Wed → 2 days). Outputs in `results/`: `gc_si_ratio_reversion_daily_events.csv`, `gc_si_ratio_reversion_daily_summary.csv` (mean/median/percentiles by trigger and direction), `gc_si_ratio_reversion_daily_by_year.csv`.
+Install:
 
 ```bash
-python gc-si-correlation-graphs/analyze_gc_si_ratio_reversion_daily.py --out-dir gc-si-correlation-graphs/results
+pip install -r gc-si-correlation-graphs/requirements-plot.txt
 ```
 
-Flags: `--gc`, `--si`, `--out-dir`, `--trigger-sigmas` (default `1.5 2.0`).
+Python 3.10+ (the scripts use `list[str]` and similar). Run commands from the repository root. Pandas and Matplotlib are enough; the backtests also import NumPy, which those packages already pull in.
 
-**GC/SI spread backtests** (`backtest_gc_si_spread.py` + `run_backtest_gc_si_spread_sweep.py`): dollar-neutral mean-reversion spread on daily closes. Signal when ratio exits μ ± kσ (k = 1.5 or 2.0; prior ISO week daily baseline). **Ratio high** → sell GC + buy SI; **ratio low** → buy GC + sell SI (both legs on entry day). Exit flat when combined spread PnL hits profit/stop **or** at entry + N trading days (calendar backstop; profit/stop checked first). Sizing: 1 GC contract; `si_contracts = (P_gc × 100) / (P_si × 5000)`. Reward:risk on $100k account — 1:3 (+3%/−1%), 1:2, 1:1, 1:5. One position at a time; skipped signals logged.
+## Charts
 
-- **Backtest A (`probable_duration`):** enter on signal day; N ∈ {1, 2, 3, 5}
-- **Backtest B (`wait_entry`):** enter 1–2 days after signal; close N ∈ {1, 2} days after entry
+`plot_gc_si.py` writes four PNGs for one session. `plot_gc_si_weekly.py` writes the same four for the ISO Monday–Friday week that contains `--day`. The pictures below are the weekly set for **2026-W07 (9–13 Feb 2026)**.
+
+Daily correlation is the Pearson correlation of intraday percent-change returns that day. A day needs at least 8 aligned bars or it is left out of the correlation sample. Figure 4’s rolling series uses a 20-bar window (about five hours). The KDE is a small Gaussian kernel inside the script (Silverman bandwidth), not SciPy.
+
+### 1. Price overlay
+
+GC `SeqClose` on the left axis, SI `SeqClose` on the right. The weekly chart drops the overnight gaps and labels the x-axis by weekday.
+
+![GC and SI overlay, week of 9 Feb 2026](results/plots/01_gc_si_overlay_weekly_2026-W07_02-09_to_02-13.png)
+
+### 2. Intraday ratio
+
+`close_gc / close_si` over the same bars. `--ratio-ylim MIN MAX` fixes this axis only.
+
+![GC/SI ratio, week of 9 Feb 2026](results/plots/02_ratio_intraday_weekly_2026-W07_02-09_to_02-13.png)
+
+### 3. Correlation distribution
+
+Histogram of the correlation sample, with an optional KDE. Vertical lines mark μ, ±1σ, ±2σ, ±3σ, and that day’s correlation. The text box is μ, σ, today’s correlation, and its z-score.
+
+On the daily script the sample is prior trading days: year-to-date in `--baseline-year` (default 2026) through the day before `--day`, or the last N days if you pass `--lookback-days`. On the weekly script the sample is 15-minute rolling correlations from the other days of that week, and the marker is still that day’s daily correlation.
+
+![Correlation distribution, week of 9 Feb 2026](results/plots/03_corr_bellcurve_weekly_2026-W07_02-09_to_02-13.png)
+
+### 4. Rolling correlation and the same distribution
+
+Bottom axis: rolling intraday correlation versus time, with horizontal lines at μ, ±1/2/3σ, and today’s daily correlation. Top axis: the KDE from figure 3, drawn for shape. The filename still says `ratio_and_bellcurve`; the chart is the correlation, not the price ratio.
+
+![Rolling correlation and distribution, week of 9 Feb 2026](results/plots/04_ratio_and_bellcurve_weekly_2026-W07_02-09_to_02-13.png)
 
 ```bash
-python gc-si-correlation-graphs/run_backtest_gc_si_spread_sweep.py \
-  --mode probable_duration --out-dir gc-si-correlation-graphs/results/spread_backtest
-python gc-si-correlation-graphs/run_backtest_gc_si_spread_sweep.py \
-  --mode wait_entry --out-dir gc-si-correlation-graphs/results/spread_backtest
+python gc-si-correlation-graphs/plot_gc_si.py --day 2026-02-11
+python gc-si-correlation-graphs/plot_gc_si_weekly.py --day 2026-02-11
 ```
 
-Outputs per mode under `results/spread_backtest/<mode>/`: `sweep_summary.csv`, `trades.csv`, `skipped_signals.csv`, `by_year.csv`.
+| Flag | Role |
+|------|------|
+| `--day` | Required. `YYYY-MM-DD`. |
+| `--gc`, `--si` | CSV paths. |
+| `--out-dir` | PNG directory. Default `gc-si-correlation-graphs/plots/`. |
+| `--baseline-year` | Daily script only. Year-to-date window when `--lookback-days` is omitted. Default 2026. |
+| `--lookback-days` | Daily script only. Last N trading days before `--day`. |
+| `--ratio-ylim` | Two floats. Figure 2 only. |
 
-**Extended delay sweep (Phase 1)** (`run_backtest_gc_si_spread_sweep_extended.py`): wider timing grids with baseline 1× sizing.
+The weekly script takes `--day`, `--gc`, `--si`, `--out-dir`, and `--ratio-ylim`.
 
-- **probable_duration:** `entry_lag ∈ {0,1,2,3,5}`, `calendar_n ∈ {1,2,3,5,6,7,8,10}`
-- **wait_entry:** `entry_lag ∈ {1..6}`, `calendar_n ∈ {1..6}`
+## Reversion study
+
+`analyze_gc_si_ratio_reversion_daily.py` does not compute PnL. For each session it builds μ and σ from the prior ISO week’s daily ratios. An event starts when the ratio leaves the band μ ± kσ (k = 1.5 or 2.0) and ends at the first later close back inside that same band.
+
+`DurationDays` is the revert index minus the cross index. A cross on Monday that is back inside on Wednesday is 2 days.
+
+Every event in this sample reverted. Nothing was still outside the band at the end of the file. The full table is `results/reversion_duration_backtest/gc_si_ratio_reversion_daily_summary.csv`. A year-by-year split is in `gc_si_ratio_reversion_daily_by_year.csv` next to it.
+
+| Trigger | Side | Events | Reverted | Median days | Mean days | P90 days | Max days |
+|---------|------|--------|----------|-------------|-----------|----------|----------|
+| 1.5σ | upper | 187 | 100% | 3 | 3.7 | 7 | 22 |
+| 1.5σ | lower | 179 | 100% | 2 | 3.1 | 6.2 | 14 |
+| 1.5σ | both | 366 | 100% | 3 | 3.4 | 7 | 22 |
+| 2.0σ | upper | 168 | 100% | 2 | 2.9 | 5 | 14 |
+| 2.0σ | lower | 155 | 100% | 2 | 3.0 | 6 | 13 |
+| 2.0σ | both | 323 | 100% | 2 | 2.9 | 5 | 14 |
+
+Upper means the ratio exited above μ + kσ. Lower means it exited below μ − kσ. The 2σ trips come back sooner than the 1.5σ trips (median 2 days versus 3). The right tail is long: a 1.5σ upper excursion lasted 22 trading days.
 
 ```bash
-python gc-si-correlation-graphs/run_backtest_gc_si_spread_sweep_extended.py \
-  --out-dir gc-si-correlation-graphs/results/spread_backtest_extended
+python gc-si-correlation-graphs/analyze_gc_si_ratio_reversion_daily.py \
+  --out-dir gc-si-correlation-graphs/results
 ```
 
-Outputs per mode: `sweep_summary.csv`, `trades.csv`, `skipped_signals.csv`, `by_year.csv`, **`by_month.csv`** (trades/wins/losses/win rate/streaks per exit month), **`top_configs.csv`** (top timing configs by Sharpe for Phase 2).
+`--trigger-sigmas` defaults to `1.5 2.0`.
 
-**Adaptive risk (Phase 2)** (`run_backtest_gc_si_spread_adaptive.py`): runs baseline vs adaptive on `top_configs.csv` from Phase 1.
+## Spread backtest
+
+`backtest_gc_si_spread.py` trades both legs on daily closes. The sweep drivers are `run_backtest_gc_si_spread_sweep.py` (short delay grid), `run_backtest_gc_si_spread_sweep_extended.py` (Phase 1, wider delays), and `run_backtest_gc_si_spread_adaptive.py` (Phase 2, the same timing with a sizing rule). `build_spread_results_summary.py` rebuilds the narrative CSV from those outputs.
+
+### Rules
+
+- Signal when the session-close ratio exits μ ± kσ, with k = 1.5 or 2.0 and μ, σ from the prior ISO week’s daily ratios.
+- Ratio high: sell 1 GC and buy SI. Ratio low: buy 1 GC and sell SI. Both legs open on the entry day.
+- Silver size is `si_contracts = (P_gc × 100) / (P_si × 5000)`, so the silver leg matches one GC contract in dollars. GC is $100 per point. SI is $5,000 per point. The silver quantity can be fractional.
+- Account value is $100,000. Exits are a profit target and a stop as a percent of that account, checked before the calendar backstop on the same day:
+
+  | Label | Profit | Stop |
+  |-------|--------|------|
+  | 1:3 | +3% | −1% |
+  | 1:2 | +2% | −1% |
+  | 1:1 | +2% | −2% |
+  | 1:5 | +5% | −1% |
+
+- If neither level is hit, the trade flattens at entry plus N trading days.
+- One position at a time. A new signal while a trade or a pending entry is open is skipped.
+- `probable_duration` may enter on the signal day (`entry_lag` 0). `wait_entry` waits at least one session (`entry_lag` starts at 1).
+- Sharpe is the annualized Sharpe of daily mark-to-market returns, using a 252-day year. Max drawdown is the peak-to-trough drop in the equity curve, in dollars.
+
+Phase 1 grids:
+
+- `probable_duration`: entry lag in {0, 1, 2, 3, 5}, hold N in {1, 2, 3, 5, 6, 7, 8, 10}
+- `wait_entry`: entry lag in {1, 2, 3, 4, 5, 6}, hold N in {1, 2, 3, 4, 5, 6}
+
+The original sweep is the corner of that grid: probable duration enters the same day and holds 1, 2, 3, or 5 days; wait-entry uses lags 1–2 and holds 1–2 days.
+
+Phase 2 applies three rules on top of a chosen timing, starting from 1× size:
 
 | Rule | Behavior |
 |------|----------|
-| Scale up | Month-to-date win rate > 50% with ≥ 2 closed trades → **1.5×** next entry |
-| Scale down | Exactly 1 consecutive loss → **0.5×** next entry (min with scale-up) |
-| Cooling-off | 2 consecutive losses → skip entries until next calendar month |
+| Scale up | Month-to-date win rate above 50% with at least 2 closed trades → 1.5× the next entry |
+| Scale down | Exactly one consecutive loss → 0.5× the next entry |
+| Cooling-off | Two consecutive losses → skip new entries until the next calendar month |
+
+### Extended-grid results
+
+Best Sharpe at each trigger, from `results/spread_delays_adaptive_risk/results_summary.csv` (`SummarySection = extended_delay_best`). Dollars are rounded. The CSV has full precision.
+
+Waiting beat entering on the signal. The best row in the whole extended grid is a 1.5σ wait: enter 4 sessions after the cross, hold up to 6, target +2% / stop −2%.
+
+| Mode | Trigger | Target / stop | Entry lag | Max hold | Trades | Win rate | Net PnL | Max drawdown | Sharpe |
+|------|---------|---------------|-----------|----------|--------|----------|---------|--------------|--------|
+| probable_duration | 1.5σ | +3% / −1% | 2 | 5 | 292 | 47.9% | $115,104 | $91,209 | 0.53 |
+| probable_duration | 2.0σ | +2% / −2% | 0 | 7 | 291 | 49.1% | −$132,396 | $164,283 | 0.44 |
+| wait_entry | 1.5σ | +2% / −2% | 4 | 6 | 227 | 55.5% | $212,576 | $47,694 | 0.66 |
+| wait_entry | 2.0σ | +2% / −2% | 4 | 4 | 226 | 55.3% | $133,582 | $29,869 | 0.64 |
+
+The 2σ probable-duration book is the best 2σ config on that grid and it loses money. Between 66% and 81% of these trades exit on the profit or the stop; the rest hit the calendar backstop. Skipped signals (a position was already open) are 74, 32, 139, and 97 in the four rows above.
+
+`SharpeVsOriginal` and `NetPnLVsOriginal` in that same file compare each extended-grid best to the best original-grid config at the same trigger. At 1.5σ in `probable_duration` the reward:risk and the 5-day hold stay the same and only the entry lag changes, from 0 to 2. That lag is worth about 0.17 Sharpe and about $234,000 of net PnL (the same-day entry loses about $119,000). The 1.5σ `wait_entry` gap, about 0.14 Sharpe and about $105,000, is best-versus-best: the original-grid winner is a different target, stop, lag, and hold.
+
+The same CSV also has `delay_curve` (Sharpe at a few entry lags, best hold at each lag) and `monthly_patterns` (how many months were all wins, all losses, or mixed). For the 1.5σ wait-entry winner, 40 months were all wins, 24 were all losses, and 50 were mixed.
+
+Median reversion from the event study is 3 days at 1.5σ and 2 days at 2.0σ. The winning wait-entry holds (6 and 4 days) sit past that median, which is the `CalendarNMinusMedianReversion` column.
+
+### Adaptive sizing
+
+Same timing as the extended-grid winners, fixed size versus the three rules above. Source: the `adaptive_vs_baseline` rows in `results_summary.csv`, and the paired files:
+
+- `results/spread_delays_adaptive_risk/phase2_adaptive/probable_duration/sweep_summary_adaptive.csv`
+- `results/spread_delays_adaptive_risk/phase2_adaptive/wait_entry/sweep_summary_adaptive.csv`
+
+Deltas are adaptive minus baseline.
+
+| Mode | Trigger | Target / stop | Variant | Trades | Win rate | Net PnL | Max drawdown | Sharpe |
+|------|---------|---------------|---------|--------|----------|---------|--------------|--------|
+| probable_duration | 1.5σ | +3% / −1% | baseline | 292 | 47.9% | $115,104 | $91,209 | 0.53 |
+| probable_duration | 1.5σ | +3% / −1% | adaptive | 206 | 46.6% | −$17,466 | $85,329 | −0.02 |
+| wait_entry | 1.5σ | +2% / −2% | baseline | 227 | 55.5% | $212,576 | $47,694 | 0.66 |
+| wait_entry | 1.5σ | +2% / −2% | adaptive | 177 | 54.2% | $170,540 | $37,972 | 0.57 |
+
+On these two configs, adaptive sizing cut net PnL (by about $133,000 and about $42,000) and cut Sharpe. Drawdown was smaller (by about $5,900 and about $9,700). The cooling-off rule is why the trade count falls: 98 and 69 signals were skipped for that reason. In the rest of `adaptive_vs_baseline`, adaptive net PnL is lower in every pair except the losing 2σ probable-duration book at +2% / −2%, where it is about $2,800 less negative and Sharpe is worse. The rule did not improve the books that made money.
+
+### How to rerun
+
+These commands need the local CSVs. They rewrite files under `results/`, including trade ledgers that this repository does not track.
 
 ```bash
+python gc-si-correlation-graphs/run_backtest_gc_si_spread_sweep.py \
+  --mode probable_duration \
+  --out-dir gc-si-correlation-graphs/results/spread_backtest
+python gc-si-correlation-graphs/run_backtest_gc_si_spread_sweep.py \
+  --mode wait_entry \
+  --out-dir gc-si-correlation-graphs/results/spread_backtest
+
+python gc-si-correlation-graphs/run_backtest_gc_si_spread_sweep_extended.py \
+  --out-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk/phase1_extended
+
 python gc-si-correlation-graphs/run_backtest_gc_si_spread_adaptive.py \
   --extended-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk/phase1_extended \
   --out-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk/phase2_adaptive \
   --summary-out-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk
 ```
 
-Phase 2 runs adaptive risk on **`extended_delay_best`** timing configs (one best lag/N per trigger σ from the full Phase 1 sweep), not only `top_configs.csv`. Use `--config-source top_configs` to restore the old behavior.
+Phase 2 reads the full Phase 1 sweep and picks the best lag and hold per trigger (`--config-source extended_delay_best`). `--config-source top_configs` uses `top_configs.csv` instead.
 
-Outputs per mode: `sweep_summary_adaptive.csv` (baseline vs adaptive), `trades_adaptive.csv`, `skipped_signals_adaptive.csv`, `by_month_adaptive.csv`.
-
-**Consolidated results summary** (`results_summary.csv`): narrative table (like reversion-study `*_summary.csv`) comparing original vs extended delays, monthly streak patterns, reversion alignment, and adaptive vs baseline deltas.
-
-| `SummarySection` | Contents |
-|------------------|----------|
-| `extended_delay_best` | Best config per mode + trigger on full extended grid; includes `SharpeVsOriginal`, `NetPnLVsOriginal`, `MedianReversionDays`, `CalendarNMinusMedianReversion` |
-| `original_delay_best` | Best config on **original** delay grid only |
-| `extended_delay_new_only` | Best among **newly added** delay values |
-| `delay_curve` | Side-by-side Sharpe/NetPnL at 4 representative entry lags (best CalendarN per lag); `*` = curve peak, `†` = extended best |
-| `monthly_patterns` | Rolled-up monthly win/loss streak stats for each extended-delay best config (`MonthsAllWins`, `MonthsAllLosses`, `MonthsMixed`, …) |
-| `overall_best` | Single best row per mode |
-| `adaptive_vs_baseline` | Paired rows with `DeltaNetPnL`, `DeltaMaxDrawdown`, `DeltaSharpe`, `DeltaWinRate` |
-
-Sweep metrics also include **`AvgWinPctOfAccount`** and **`AvgLossPctOfAccount`** (average win/loss as a fraction of the $100k account).
-
-**Month patterns report** (`month_patterns_summary.csv`): per-config counts of all-win, all-loss, and mixed months. Written under each mode in the summary output directory.
-
-**Delay curve report** (`delay_curve_summary.csv`): per mode/trigger, best CalendarN at entry lags **0/1/2/5** (probable_duration) or **1/2/4/6** (wait_entry), using the extended-best reward:risk ratio. Shows whether Sharpe improves monotonically or peaks mid-curve.
-
-Written automatically to `results/spread_delays_adaptive_risk/results_summary.csv` after Phase 2, and to the Phase 1 out dir after the extended sweep. Rebuild without re-running backtests:
+Rebuild `results_summary.csv` without rerunning the backtests:
 
 ```bash
 python gc-si-correlation-graphs/build_spread_results_summary.py \
@@ -102,134 +210,45 @@ python gc-si-correlation-graphs/build_spread_results_summary.py \
   --out-dir gc-si-correlation-graphs/results/spread_delays_adaptive_risk
 ```
 
-Use `--phase1-only` to omit `adaptive_vs_baseline` rows.
+`--phase1-only` drops the adaptive comparison.
 
-## What gets produced (exactly)
+## Single-leg GC backtests
 
-All outputs are named with your `--day` as `YYYY-MM-DD`.
+Two earlier scripts trade one GC contract and ignore the silver leg except as the ratio signal. Their trade ledgers are not published here.
 
-| File | Contents |
-|------|----------|
-| `01_gc_si_overlay_<date>.png` | **Dual y-axes:** GC `SeqClose` vs time (left), SI `SeqClose` vs time (right). Only the chosen day’s bars. |
-| `02_ratio_intraday_<date>.png` | **GC/SI ratio** (`close_gc / close_si`) vs time for that day. Y-axis auto-scales unless you pass `--ratio-ylim MIN MAX`. |
-| `03_corr_bellcurve_<date>.png` | **Distribution of daily Pearson correlation** between GC and SI **intraday returns**, over a **lookback window** of prior trading days (see below). Histogram (counts) on the left y-axis; optional KDE on a **right** y-axis (density). Vertical lines at μ, ±1σ/±2σ/±3σ, and **today’s** daily correlation. Text box: μ, σ, today’s corr, deviation, z-score. |
-| `04_ratio_and_bellcurve_<date>.png` | **Composite:** **Rolling intraday Pearson correlation** (20 consecutive 15m bars ≈ 5h window) vs **time** on the **bottom** x-axis; **y-axis = correlation**. Horizontal **dashed** lines at μ ± 1σ, ±2σ, ±3σ; **solid** lines at μ and **today’s daily** correlation. A **Gaussian KDE** of the **same historical daily correlations** as figure 3 is drawn using a **second x-axis** on the **top** (`twiny`): correlation on that axis, with **density normalized** to a relative height and **mapped into the correlation y-range** (shape only—not literal density units). Stats box matches figure 3 context. |
+`backtest_gc_si_ratio.py` uses intraday bars. μ and σ come from the prior ISO week’s intraday ratio. Sell 1 GC above μ + 2σ, buy 1 GC below μ − 2σ. Exit at +2% or −0.5% of the $100,000 account ($2,000 / $500 on one GC, multiplier $100).
 
-Weekly outputs are named with week token `YYYY-Www_MM-DD_to_MM-DD` (ISO Monday through Friday).
-
-| File | Contents |
-|------|----------|
-| `01_gc_si_overlay_weekly_<week>.png` | **Dual y-axes:** GC `SeqClose` (left) and SI `SeqClose` (right) using all aligned 15m bars in the ISO Mon-Fri week. X-axis is compressed to remove overnight gaps, with ticks labeled by day (`Mon`, `Tue`, ...). |
-| `02_ratio_intraday_weekly_<week>.png` | **GC/SI ratio** (`close_gc / close_si`) across all 15m bars in the ISO Mon-Fri week. Same gapless day-to-day x-axis treatment as weekly figure 01 and optional `--ratio-ylim`. |
-| `03_corr_bellcurve_weekly_<week>.png` | **Weekly bell curve view:** histogram + KDE built from **15m rolling-correlation sequence samples** (20-bar rolling Pearson) from the **other days of that week** (excluding chosen `--day`). Vertical markers and stats still reference **today’s daily correlation** and derived μ/σ/z of the weekly sample. |
-| `04_ratio_and_bellcurve_weekly_<week>.png` | **Weekly composite:** rolling intraday correlation vs time for the full week plus a top-axis KDE built from the **same 15m rolling-correlation weekly sample** used in weekly figure 03. Sigma bands, mean line, and today-correlation line are computed from that weekly sample. |
-
-**Naming note:** Figure 4’s filename still contains `ratio_and_bellcurve` for historical reasons; the chart is about **correlation**, not the GC/SI price ratio.
-
-## How the script works (pipeline)
-
-1. **Load and merge** `GC.csv` and `SI.csv` on  
-   `Year, Month, Day, HourOfDay, MinOfHour`  
-   **Inner join**—only rows present in both files are kept. Timestamps must align for meaningful plots.
-
-2. **Per calendar day**, compute **one daily Pearson correlation** of **pct-change** returns on GC vs SI closes, using only bars where both returns exist; require at least **8** bars that day (`MIN_BARS_PER_DAY`) or the day is invalid for correlation.
-
-3. **Chosen day (`--day`):** subset merged data to that date for figures 1, 2, and 4.
-
-4. **Historical sample for figures 3 and 4** (and for μ, σ, z on figure 4):  
-   - **Default:** all trading days in `--baseline-year` from **Jan 1** through the **day before** `--day`.  
-   - **Override:** `--lookback-days N` uses the **last N** trading days **before** `--day` (ignores the YTD window).  
-   You need **at least 2** prior days with valid daily correlation or the script exits before drawing figures 3–4.
-
-5. **Figure 4 rolling series:** For the chosen day only, `pct_change` on GC and SI closes, then a **rolling window correlation** with length `ROLLING_CORR_BARS` (20). KDE uses a lightweight **Gaussian KDE** (Silverman bandwidth) implemented in-script—no SciPy.
-
-6. **Styling:** Non-interactive Matplotlib backend (`Agg`), dark theme, 150 DPI PNGs.
-
-## Requirements
-
-- Python 3.10+ recommended (uses `list[str]` typing style).
-- Dependencies: see [`requirements-plot.txt`](requirements-plot.txt) (`pandas`, `matplotlib`).
-
-Install (from repo root or this folder):
+`backtest_gc_si_ratio_daily.py` uses session closes and the prior week’s daily ratios. The default waits one trading day and enters only if the ratio is still outside the same band. `--continuation` enters at the signal close and flips the direction: long above +2σ, short below −2σ. Exit is +3% or −1% of the account.
 
 ```bash
-pip install -r gc-si-correlation-graphs/requirements-plot.txt
+python gc-si-correlation-graphs/backtest_gc_si_ratio.py --out-dir gc-si-correlation-graphs/results
+python gc-si-correlation-graphs/backtest_gc_si_ratio_daily.py --out-dir gc-si-correlation-graphs/results
+python gc-si-correlation-graphs/backtest_gc_si_ratio_daily.py --continuation --out-dir gc-si-correlation-graphs/results
 ```
 
-## How to run
+## Assumptions
 
-Default data paths expect **`../gc-si/GC.csv`** and **`../gc-si/SI.csv`** relative to this directory (i.e. `sentiment-analytics/gc-si/` when you run from the repo).
+- Fills are at the close of the 15-minute bar used as the session close. There is no open-to-close delay and no partial fill.
+- There is no commission, slippage, or financing cost. The only exits are the percent-of-account targets above, or the calendar backstop.
+- Contract math uses a $100 GC multiplier and a $5,000 SI multiplier. Silver size can be a fraction of a contract.
+- One position at a time. Overlapping signals are discarded, so the trade count is not the event count from the reversion study.
+- A position still open on the last day of the file is closed and marked censored.
+- The prior-week baseline removes the signal day from μ and σ. It does not remove any other form of selection: the delay grid and the reward:risk pairs were searched, and the tables above report the best Sharpe in that search.
+- Adaptive results are one rule set (1.5×, 0.5×, two-loss month pause), not a fitted optimizer.
 
-**Minimal example** (writes to `gc-si-correlation-graphs/plots/` by default):
+## Files
 
-```bash
-python gc-si-correlation-graphs/plot_gc_si.py --day 2026-03-10
-```
-
-**Weekly script (separate from daily):**
-
-```bash
-python gc-si-correlation-graphs/plot_gc_si_weekly.py --day 2026-03-10
-```
-
-This generates:
-
-- `01_gc_si_overlay_weekly_<week>.png`
-- `02_ratio_intraday_weekly_<week>.png`
-- `03_corr_bellcurve_weekly_<week>.png`
-- `04_ratio_and_bellcurve_weekly_<week>.png`
-
-Where `<week>` is `YYYY-Www_MM-DD_to_MM-DD` for the ISO Mon-Fri window containing `--day`.
-
-**Explicit paths:**
-
-```bash
-python gc-si-correlation-graphs/plot_gc_si.py \
-  --day 2026-03-10 \
-  --gc path/to/GC.csv \
-  --si path/to/SI.csv \
-  --out-dir gc-si-correlation-graphs/plots
-```
-
-**Use last 60 trading days before `--day` for the bell curve / KDE baseline:**
-
-```bash
-python gc-si-correlation-graphs/plot_gc_si.py --day 2026-03-10 --lookback-days 60
-```
-
-**Fix ratio y-limits on figure 2:**
-
-```bash
-python gc-si-correlation-graphs/plot_gc_si.py --day 2026-03-10 --ratio-ylim 75 95
-```
-
-**Useful flags**
-
-| Flag | Role |
-|------|------|
-| `--day` | Required. Session date `YYYY-MM-DD`. |
-| `--gc`, `--si` | CSV paths (defaults: `../gc-si/GC.csv`, `../gc-si/SI.csv`). |
-| `--out-dir` | Output directory for PNGs (default: `plots/` under this folder). |
-| `--baseline-year` | Year for YTD lookback when `--lookback-days` is omitted (default: 2026). |
-| `--lookback-days` | If set, use last N trading days before `--day` instead of YTD. |
-| `--ratio-ylim` | Two floats: min and max y for figure 2 only. |
-
-For `plot_gc_si_weekly.py`, only `--day`, `--gc`, `--si`, `--out-dir`, and `--ratio-ylim` apply.
-
-## Weekly behavior details
-
-The weekly script is additive and does not replace daily outputs.
-
-- **Figure 01 and 02 weekly:** still use the original 15-minute bars, but x-axis ticks are day names (`Mon`, `Tue`, ...) placed at the first available bar of each day.
-- **Figure 03 weekly:** "today's correlation" is still the chosen day's daily Pearson correlation (from that day's 15-minute returns). The bell curve sample is built from 15m rolling-correlation sequence values from the *other* days in the same Mon-Fri week.
-- **Figure 04 weekly:** uses the same weekly 15m rolling-correlation sample semantics as weekly figure 03.
-- **Edge cases:** if the week has missing/sparse data, the script still completes. It renders fallback visuals/annotations when correlations cannot be computed with normal sample sizes.
-
-## Troubleshooting
-
-- **`--day` needs at least 8 bars:** That date has too few aligned bars after the merge.
-- **Could not compute daily correlation for …:** Not enough valid intraday returns that day.
-- **Need at least 2 prior days with valid correlation:** Expand history (earlier `--day`, larger `--lookback-days`, or ensure CSVs cover more dates).
-- **`--day` is before Jan 1 of baseline year:** Use `--lookback-days` or a later `--day`.
-
-Run `python gc-si-correlation-graphs/plot_gc_si.py --help` for the full CLI reference.
+| Path | What it is |
+|------|------------|
+| `plot_gc_si.py`, `plot_gc_si_weekly.py` | The four charts |
+| `analyze_gc_si_ratio_reversion_daily.py` | Reversion timing, no PnL |
+| `backtest_gc_si_ratio.py`, `backtest_gc_si_ratio_daily.py` | Single-leg GC backtests |
+| `backtest_gc_si_spread.py` | Spread engine |
+| `run_backtest_gc_si_spread_sweep.py` | Original delay grid |
+| `run_backtest_gc_si_spread_sweep_extended.py` | Phase 1 delay grid |
+| `run_backtest_gc_si_spread_adaptive.py` | Phase 2 sizing |
+| `build_spread_results_summary.py` | Rebuilds `results_summary.csv` |
+| `results/reversion_duration_backtest/gc_si_ratio_reversion_daily_summary.csv` | Reversion table |
+| `results/spread_delays_adaptive_risk/results_summary.csv` | Spread narrative table |
+| `results/spread_delays_adaptive_risk/phase2_adaptive/` | Baseline versus adaptive |
+| `results/plots/01`–`04` `...weekly_2026-W07...png` | Example charts |
